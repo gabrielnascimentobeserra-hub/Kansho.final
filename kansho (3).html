@@ -1,0 +1,2818 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Kanshō reúne as notas de animes do IMDb, MyAnimeList e AniList e calcula uma média justa, ajustada pelo número de votos.">
+<meta name="theme-color" content="#3d0a14">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%239b1b3a'/%3E%3Cpath fill='%23ff8c00' d='M16 5.5L18.76 12.7 26.46 13.1 20.47 17.95 22.47 25.4 16 21.2 9.53 25.4 11.53 17.95 5.54 13.1 13.24 12.7Z'/%3E%3C/svg%3E">
+<title>Kanshō | Agregador de Avaliações de Animes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+
+<style>
+  /* =====================================================================
+     ESTILOS — MOBILE FIRST
+     O CSS-base descreve o celular (tela estreita). Cada @media (min-width: …)
+     só ACRESCENTA o que muda em telas maiores: 640px (tablet), 1000px (duas
+     colunas), 1120px (menu aberto no cabeçalho) e 1700px (telas grandes).
+     ===================================================================== */
+
+  /* ===== Variáveis ===== */
+  :root {
+    --bg: #4b5b6f;
+    --header: #3d0a14;
+    --card: #9b1b3a;
+    --accent: #ff8c00;
+    --news-panel: #6b93a3;
+    --news-title: #3d0a14;       /* escuro sobre o painel azul: contraste 5:1 */
+    --text: #ffffff;
+    --text-soft: #e9d5da;        /* secundário sobre o vermelho dos cards */
+    --text-2: #eef2f7;           /* secundário sobre o azul-acinzentado (mín. 4,5:1) */
+    --muted: #f6ecd4;
+    --cream: #fff1dc;
+    --row-a: #556b88;
+    --row-b: #475a72;
+    --focus: #ffd27a;            /* anel de foco do teclado */
+    --tap: 44px;                 /* alvo de toque confortável */
+    --radius: 4px;
+    --score-w: 52px;             /* largura de cada coluna de nota no ranking (celular) */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scrollbar-color: var(--accent) #6b93a3; }
+  body {
+    font-family: 'Roboto Condensed', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; border: 0; background: none; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* foco visível em qualquer elemento interativo (teclado) */
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  main:focus { outline: none; }
+
+  .sr-only {
+    position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  .skip-link {
+    position: absolute; left: 8px; top: -80px; z-index: 200;
+    background: var(--accent); color: #3d0a14; font-weight: 700;
+    padding: 12px 18px; border-radius: 0 0 6px 6px;
+  }
+  .skip-link:focus { top: 0; }
+
+  /* ===== Cabeçalho (celular: linha 1 = menu + logo + conta; linha 2 = busca) ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--header); border-bottom: 1px solid #2a060e;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "menu logo user" "search search search";
+    align-items: center; gap: 4px 8px;
+    padding: 6px 8px 8px;
+  }
+  .menu-toggle {
+    grid-area: menu; width: var(--tap); height: var(--tap);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #c9cfd8; border: 1px solid rgba(143, 162, 184, .55); border-radius: 6px;
+  }
+  .menu-toggle svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+  .menu-toggle .ico-close { display: none; }
+  .menu-toggle[aria-expanded="true"] .ico-open { display: none; }
+  .menu-toggle[aria-expanded="true"] .ico-close { display: block; }
+
+  .logo {
+    grid-area: logo; justify-self: start;
+    display: inline-flex; align-items: center; gap: 8px; min-height: var(--tap);
+    font-size: 22px; font-weight: 700; letter-spacing: 1px; color: #c9cfd8;
+  }
+  .logo svg { width: 30px; height: 30px; flex: 0 0 30px; }
+  /* em telas muito estreitas só o símbolo aparece (o nome continua para leitores de tela) */
+  .logo-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+
+  /* navegação: no celular é um menu que abre sob o cabeçalho */
+  .site-nav {
+    display: none;
+    position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column;
+    background: var(--header); border-bottom: 1px solid #2a060e;
+    padding: 4px 8px 12px; box-shadow: 0 12px 20px rgba(0, 0, 0, .35);
+  }
+  .site-nav.open { display: flex; }
+  .site-nav a {
+    display: flex; align-items: center; min-height: 48px; padding: 0 12px;
+    color: #8fa2b8; font-weight: 700; font-size: 18px; border-radius: 4px;
+    transition: color .2s, background .2s;
+  }
+  .site-nav a:hover { color: #fff; }
+  .site-nav a.active { background: rgba(143, 162, 184, .35); color: #dfe6ee; }
+
+  .search {
+    grid-area: search; position: relative;
+    display: flex; align-items: center;
+    background: var(--accent); border-radius: 6px;
+    height: var(--tap); padding: 0 4px 0 12px;
+  }
+  .search:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .search input {
+    flex: 1; min-width: 0; height: 100%;
+    border: 0; outline: 0; background: transparent;
+    padding: 0 8px; font-family: inherit; font-size: 16px; color: #3d0a14;
+  }
+  .search input::placeholder { color: #5a1a24; opacity: 1; }
+  .search-btn { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; }
+  .search-btn svg { width: 20px; height: 20px; fill: none; stroke: #3d0a14; stroke-width: 2.5; }
+
+  .search-list {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
+    list-style: none; background: var(--header);
+    border: 1px solid rgba(232, 217, 181, .45); border-radius: 6px;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, .4);
+    max-height: min(60vh, 420px); overflow: auto;
+  }
+  .search-list li {
+    display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 10px;
+    cursor: pointer; color: #fff;
+  }
+  .search-list li:hover, .search-list li.active { background: rgba(255, 255, 255, .16); }
+  .search-list .sl-cover {
+    flex: 0 0 32px; height: 44px; border-radius: 2px;
+    background-color: #c8d0da; background-size: cover; background-position: center;
+  }
+  .search-list .sl-t { flex: 1; min-width: 0; font-size: 16px; line-height: 1.15; }
+  .search-list .sl-m { font-size: 14px; font-weight: 700; color: var(--cream); }
+  .search-list .sl-empty { cursor: default; color: var(--text-2); }
+  .search-list .sl-empty:hover { background: none; }
+  .search-list .sl-all { justify-content: center; font-weight: 700; color: var(--cream); }
+
+  .user-area { grid-area: user; justify-self: end; display: flex; align-items: center; gap: 6px; }
+  .auth-link {
+    display: inline-flex; align-items: center; min-height: var(--tap);
+    color: #8fa2b8; font-weight: 700; font-size: 15px; padding: 0 10px; border-radius: 4px;
+    transition: color .2s, filter .2s;
+  }
+  .auth-link:hover { color: #fff; }
+  .auth-link.signup { background: var(--accent); color: #3d0a14; min-height: 40px; }
+  .auth-link.signup:hover { color: #3d0a14; filter: brightness(1.1); }
+  .logout-btn { min-height: var(--tap); color: #8fa2b8; font-weight: 700; font-size: 15px; padding: 0 10px; border-radius: 4px; transition: color .2s; }
+  .logout-btn:hover { color: #fff; }
+  .profile { display: flex; align-items: center; gap: 8px; min-height: var(--tap); font-weight: 700; font-size: 16px; color: #c9cfd8; }
+  .profile span { display: none; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #d9a77a, #7a4a2c);
+    border: 2px solid #c9cfd8;
+  }
+
+  .data-banner {
+    background: rgba(255, 140, 0, .18); border-bottom: 1px solid rgba(255, 140, 0, .5);
+    color: #fff1dc; font-size: 14px; text-align: center; padding: 6px 12px;
+  }
+  .data-banner button {
+    margin-left: 8px; min-height: 32px; padding: 2px 12px; border-radius: 4px;
+    background: var(--accent); color: #3d0a14; font-weight: 700; font-size: 14px;
+  }
+  .data-banner button:hover { filter: brightness(1.1); }
+
+  /* ===== Layout principal (celular: uma coluna; as notícias vão para o fim) ===== */
+  main {
+    max-width: 1440px; margin: 0 auto; padding: 10px 12px 30px;
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px;
+  }
+  .col-main { min-width: 0; }
+  .view { display: none; }
+  .view.active { display: block; }
+  main.full aside { display: none; }
+  main.full .col-main { grid-column: 1 / -1; }
+
+  /* ===== Destaque (carrossel) ===== */
+  .hero {
+    display: grid; grid-template-columns: 1fr;
+    border-radius: 5px; overflow: hidden; background: var(--card); position: relative;
+  }
+  .hero-img {
+    position: relative; height: 190px;
+    background-size: cover; background-position: center;
+    transition: background .4s;
+  }
+  .dots {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    display: flex; padding: 0 4px; border-radius: 16px; background: rgba(0, 0, 0, .4);
+  }
+  .dot { position: relative; width: 28px; height: 28px; }
+  .dot::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; border: 2px solid #fff; }
+  .dot.active::before { background: #fff; }
+  .hero-pause {
+    position: absolute; top: 8px; left: 8px; z-index: 3;
+    width: var(--tap); height: var(--tap); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(61, 10, 20, .78); color: #fff;
+  }
+  .hero-pause svg { width: 20px; height: 20px; fill: currentColor; }
+  .hero-pause[data-state="paused"] .ic-pause, .hero-pause:not([data-state="paused"]) .ic-play { display: none; }
+
+  .hero-info { padding: 14px 14px 12px; position: relative; display: flex; flex-direction: column; }
+  .hero-info h2 { font-size: clamp(19px, 1.65vw, 28px); line-height: 1.1; margin-bottom: 10px; }
+  .hero-info h2 a { display: inline-block; min-height: 24px; }
+  .hero-info h2 a:hover { text-decoration: underline; }
+  .hero-info p { font-size: clamp(14px, 1vw, 17px); line-height: 1.2; color: var(--text-soft); margin-bottom: 10px; }
+  .scores { margin-top: auto; font-weight: 700; font-size: clamp(17px, 1.3vw, 22px); line-height: 1.1; }
+  .hero-next {
+    position: absolute; right: 8px; bottom: 8px;
+    width: var(--tap); height: var(--tap);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 26px; line-height: 1;
+  }
+
+  /* ===== Títulos de seção ===== */
+  .section-title { font-size: clamp(18px, 1.4vw, 24px); font-weight: 700; line-height: 1.1; color: var(--muted); margin: 26px 0 10px; }
+
+  /* ===== Faixas horizontais ===== */
+  .strip-wrap { position: relative; }
+  .strip { display: flex; gap: 14px; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; padding-right: 10px; }
+  .strip::-webkit-scrollbar { display: none; }
+  .strip-arrow {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%); z-index: 5;
+    width: var(--tap); height: var(--tap); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(61, 10, 20, .75); color: var(--cream); font-size: 24px;
+  }
+
+  /* Cards Top 10 (o .top-item agrupa o link e o botão de favoritar, que não pode ficar dentro do <a>) */
+  .top-item { position: relative; flex: 0 0 270px; height: 180px; transition: transform .2s; }
+  .top-item:hover { transform: translateY(-3px); }
+  .top-card { width: 100%; height: 100%; background: var(--card); border-radius: 5px; display: flex; gap: 12px; padding: 9px; transition: background .2s; }
+  .top-item:hover .top-card { background: #ad2043; }
+  .poster { flex: 0 0 42%; height: 100%; border-radius: 3px; background-size: cover; background-position: center; position: relative; }
+  .rank { position: absolute; top: 0; left: 0; background: var(--header); color: #fff; font-size: 14px; font-weight: 700; padding: 1px 8px; border-bottom-right-radius: 4px; }
+  /* a base da coluna de texto fica reservada ao botão de favoritar (canto inferior direito) */
+  .top-card .info { min-width: 0; overflow: hidden; padding-bottom: 46px; }
+  .top-card h3 {
+    font-size: 16px; line-height: 1.08; margin-bottom: 6px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .top-card p {
+    font-size: 12px; line-height: 1.2; color: var(--text-soft);
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* Cards de trailers */
+  .trailer-card { position: relative; flex: 0 0 250px; background: var(--card); border-radius: 5px; padding: 2px 2px 6px; transition: transform .2s; }
+  .trailer-card:hover { transform: translateY(-3px); }
+  .thumb { height: 140px; border-radius: 3px; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; position: relative; }
+  .play { width: 56px; height: 56px; border-radius: 50%; border: 3px solid #fff; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .25); }
+  .play::after { content: ""; margin-left: 5px; border-style: solid; border-width: 11px 0 11px 18px; border-color: transparent transparent transparent #fff; }
+  .badge {
+    position: absolute; left: 8px; bottom: 8px; padding: 3px 7px; border-radius: 3px;
+    background: rgba(0, 0, 0, .6);
+    font-weight: 700; font-size: 14px; line-height: 1; text-transform: uppercase;
+  }
+  .trailer-card h3 { font-size: 14px; font-weight: 400; padding: 6px 8px 0; color: var(--text-soft); }
+
+  /* ===== MAIS VOTADOS (celular: colunas estreitas; o coração fica sob o número da posição) ===== */
+  .rank-grid {
+    --cols: 40px 56px minmax(0, 1fr) var(--score-w) var(--score-w) var(--score-w);
+    display: grid; grid-template-columns: var(--cols);
+  }
+  .rank-head { align-items: end; padding: 24px 0 10px; }
+  .rank-head h1 { grid-column: 1 / 4; font-size: 20px; font-weight: 700; padding-left: 6px; }
+  .rank-head .col-label { text-align: center; font-size: 12px; font-weight: 700; color: #dfe6ee; text-transform: uppercase; }
+
+  .row { min-height: 96px; align-items: stretch; transition: filter .2s; }
+  .row-wrap { position: relative; }
+  .row-wrap:nth-child(odd)  > .row { background: var(--row-a); }
+  .row-wrap:nth-child(even) > .row { background: var(--row-b); }
+  .row:hover { filter: brightness(1.15); }
+  .row-pos {
+    font-family: 'Roboto', sans-serif; font-weight: 700; font-size: 32px; color: var(--cream);
+    display: flex; align-items: flex-start; justify-content: center; padding-top: 10px;
+  }
+  .row-pos { min-width: 0; overflow: hidden; }
+  .row-pos[data-d="3"] { font-size: 20px; letter-spacing: -.5px; }   /* 3 dígitos (posição 100+) continuam dentro da coluna */
+  .row-cover-box { display: flex; align-items: center; }
+  .cover { width: 48px; height: 62px; border-radius: 2px; background-color: #c8d0da; background-size: cover; background-position: center; }
+  .row-name { padding: 8px 6px 8px 4px; align-self: start; min-width: 0; }
+  .row-name .t { font-family: 'Roboto', sans-serif; font-weight: 300; font-size: 15px; color: var(--muted); line-height: 1.1; }
+  .row-name .m { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+  .row-name .m b { color: var(--cream); font-weight: 700; }
+  .score-cell {
+    border-left: 1px solid rgba(246, 236, 212, .75);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Roboto', sans-serif; font-weight: 300; font-size: 16px; color: var(--muted);
+  }
+  .rank-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 12px; font-size: 14px; color: var(--text-2); }
+  .sort-btn { min-height: var(--tap); padding: 0 16px; border-radius: 22px; border: 2px solid var(--accent); background: transparent; color: var(--cream); font: inherit; font-weight: 700; cursor: pointer; }
+  .sort-btn[aria-pressed="true"] { background: var(--accent); color: #1b0a00; }
+  .pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin: 16px 0 4px; color: var(--text-2); font-size: 14px; }
+  .pager[hidden] { display: none; }
+  .pg-btn { min-height: var(--tap); padding: 0 18px; border-radius: 22px; border: 2px solid var(--accent); background: transparent; color: var(--cream); font: inherit; font-weight: 700; cursor: pointer; }
+  .pg-btn:disabled { opacity: .45; cursor: default; }
+  .pg-btn:not(:disabled):hover { background: var(--accent); color: #1b0a00; }
+  .pg-info { text-align: center; }
+  .syn-note { margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .note { margin-top: 14px; font-size: 14px; color: var(--text-2); line-height: 1.35; }
+
+  /* ===== GÊNEROS ===== */
+  .genres-title { font-size: 28px; font-weight: 700; color: var(--muted); padding-bottom: 2px; border-bottom: 4px solid var(--card); margin-bottom: 30px; overflow-wrap: anywhere; }
+  .genres-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px; }
+  .genre-card { display: block; position: relative; background: var(--card); padding: 6px; border-radius: 3px; aspect-ratio: 1.07 / 1; transition: transform .2s, filter .2s; }
+  .genre-card:hover { transform: translateY(-5px); filter: brightness(1.12); }
+  .genre-img { width: 100%; height: 100%; background-size: cover; background-position: center; position: relative; overflow: hidden; }
+  .genre-img span {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 7px;
+    font-weight: 700; font-size: 15px; line-height: 1.05; background: rgba(0, 0, 0, .72);
+  }
+  .genre-img small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--text-2); }
+  .crumb { display: inline-flex; align-items: center; min-height: var(--tap); margin-bottom: 6px; color: var(--muted); font-weight: 700; font-size: 15px; }
+  .crumb:hover { text-decoration: underline; }
+
+  /* ===== Barra de rolagem (azul com destaque laranja) ===== */
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: #6b93a3; }
+  ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
+  /* ===== PÁGINA DO ANIME ===== */
+  .back { display: inline-flex; align-items: center; min-height: var(--tap); margin: 18px 0 8px; color: var(--muted); font-weight: 700; font-size: 15px; }
+  .back:hover { text-decoration: underline; }
+  .detail { background: var(--row-a); border-radius: var(--radius); padding: 14px; display: grid; grid-template-columns: 1fr; gap: 26px; }
+  .detail-side { width: 160px; }
+  .detail .big-cover { width: 160px; height: 226px; border-radius: 3px; background-color: #c8d0da; background-size: cover; background-position: center; }
+  .detail h1 { font-size: 28px; line-height: 1.05; margin-bottom: 8px; }
+  .pos-badge { display: inline-block; background: var(--header); color: var(--cream); font-weight: 700; font-size: 14px; padding: 3px 10px; border-radius: 3px; margin-bottom: 12px; }
+  .meta { color: var(--text-2); font-size: 15px; margin-bottom: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip { background: rgba(0, 0, 0, .28); padding: 3px 12px; border-radius: 14px; font-size: 14px; }
+  a.chip { display: inline-flex; align-items: center; min-height: 28px; border: 1px solid rgba(246, 236, 212, .6); }
+  a.chip:hover { background: rgba(0, 0, 0, .45); }
+  .synopsis { font-family: 'Roboto', sans-serif; font-weight: 300; font-size: 16px; line-height: 1.5; color: var(--text-2); }
+  .detail-scores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 18px; }
+  .score-card { background: var(--row-b); border-radius: var(--radius); padding: 12px 14px; }
+  .score-card.avg { background: var(--card); }
+  .score-card .site { font-size: 14px; font-weight: 700; color: var(--text-2); text-transform: uppercase; }
+  .score-card.avg .site { color: var(--text-soft); }
+  .score-card .val { font-family: 'Roboto', sans-serif; font-size: 36px; font-weight: 400; color: var(--cream); line-height: 1.1; }
+  .score-card .votes { font-size: 13px; color: var(--text-2); margin-top: 6px; }
+  .score-card.avg .votes { color: var(--text-soft); }
+  .bar { height: 6px; background: rgba(255, 255, 255, .15); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  .ext-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .ext-links a { display: inline-flex; align-items: center; min-height: var(--tap); background: var(--accent); color: #3d0a14; font-weight: 700; font-size: 15px; padding: 0 14px; border-radius: 4px; transition: filter .2s; }
+  .ext-links a:hover { filter: brightness(1.1); }
+
+  /* ===== CADASTRO / LOGIN ===== */
+  .auth-card { max-width: 420px; margin: 16px auto 0; background: var(--row-a); border-radius: var(--radius); padding: 18px; }
+  .auth-card h1 { font-size: 32px; line-height: 1.05; margin-bottom: 4px; }
+  .auth-card .sub { color: var(--text-2); font-size: 16px; margin-bottom: 18px; }
+  .auth-card .btn-save { width: 100%; margin-top: 4px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-weight: 700; font-size: 16px; color: var(--muted); margin-bottom: 4px; }
+  .field input {
+    width: 100%; height: var(--tap); padding: 0 10px;
+    background: var(--row-b); color: var(--text);
+    border: 1px solid rgba(246, 236, 212, .6); border-radius: var(--radius);
+    font-family: inherit; font-size: 16px;
+  }
+  .field .hint { font-size: 14px; color: var(--text-2); margin-top: 3px; }
+  .auth-error { display: none; background: var(--card); border-radius: var(--radius); padding: 8px 12px; margin-bottom: 14px; font-size: 15px; }
+  .auth-error.show { display: block; }
+  .auth-switch { margin-top: 16px; text-align: center; color: var(--text-2); font-size: 15px; }
+  .auth-switch a, .empty-box a, .about a { color: var(--cream); font-weight: 700; text-decoration: underline; }
+
+  /* ===== PERFIL / CONFIGURAÇÕES ===== */
+  .profile-head { background: var(--row-a); border-radius: var(--radius); padding: 14px; display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .profile-head .avatar-lg { width: 64px; height: 64px; flex: 0 0 64px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #d9a77a, #7a4a2c); border: 3px solid #c9cfd8; }
+  .profile-head h1 { font-size: 26px; line-height: 1.05; margin-bottom: 6px; }
+  .profile-head .since { color: var(--text-2); font-size: 16px; }
+  .profile-head .since b { color: var(--cream); }
+  .settings-panel { background: var(--row-a); border-radius: var(--radius); padding: 14px; }
+  .settings-panel h2 { font-size: 24px; color: var(--muted); padding-bottom: 4px; border-bottom: 4px solid var(--card); margin-bottom: 8px; }
+  .setting { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 0; border-bottom: 1px solid rgba(246, 236, 212, .25); }
+  .setting:last-of-type { border-bottom: 0; }
+  .setting .label { font-size: 18px; font-weight: 700; }
+  .setting .hint { font-size: 14px; color: var(--text-2); margin-top: 2px; font-weight: 400; }
+  .setting input[type="text"], .setting select {
+    width: 100%; min-width: 0; height: var(--tap); padding: 0 10px;
+    background: var(--row-b); color: var(--text);
+    border: 1px solid rgba(246, 236, 212, .6); border-radius: var(--radius);
+    font-family: inherit; font-size: 16px;
+  }
+  .switch { position: relative; display: inline-block; width: 52px; height: 30px; flex: 0 0 52px; }
+  .switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+  .switch .slider { position: absolute; inset: 0; background: var(--row-b); border: 1px solid rgba(246, 236, 212, .6); border-radius: 30px; transition: background .2s; }
+  .switch .slider::before { content: ""; position: absolute; left: 4px; top: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform .2s; }
+  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(22px); background: #fff; }
+  .switch input:focus-visible + .slider { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .settings-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+  .btn-save { background: var(--accent); color: #3d0a14; font-weight: 700; font-size: 16px; min-height: var(--tap); padding: 0 22px; border-radius: var(--radius); transition: filter .2s; }
+  .btn-save:hover { filter: brightness(1.1); }
+  .save-msg { color: var(--cream); font-size: 15px; opacity: 0; transition: opacity .3s; }
+  .save-msg.show { opacity: 1; }
+
+  /* ===== FAVORITOS (o mesmo grid de cards serve a Favoritos, busca e páginas de gênero) ===== */
+  .fav-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--cream); transition: transform .15s, color .2s, background .2s; }
+  .fav-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; flex: 0 0 auto; }
+  .fav-btn:hover { transform: scale(1.1); }
+  .fav-btn[aria-pressed="true"] { color: #ff5a7a; }
+  .fav-btn[aria-pressed="true"] svg { fill: currentColor; }
+  .fav-btn.pop svg { animation: heart-pop .35s ease-out; }
+  @keyframes heart-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+  /* Posição do botão em cada contexto: sempre numa área vazia do próprio layout (nunca sobre capas ou textos) */
+  .fav-btn.icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(61, 10, 20, .78); }
+  .fav-btn.icon svg { width: 20px; height: 20px; }
+  .fav-btn.fav-hero { position: absolute; right: 58px; bottom: 8px; }                                   /* destaque: à esquerda da seta */
+  .fav-btn.fav-top  { position: absolute; right: 8px; bottom: 8px; }                                    /* Top 10: base da coluna de texto */
+  .fav-btn.fav-row  { position: absolute; left: 4px; bottom: 6px; width: 32px; height: 32px; }          /* ranking (celular): sob o número da posição */
+  .fav-btn.fav-row svg { width: 18px; height: 18px; }
+  .fav-btn.fav-inline { flex: 0 0 auto; }                                                               /* Favoritos: rodapé do card, ao lado da média */
+  .fav-btn.fav-side {                                                                                   /* página do anime: sob a capa */
+    width: 100%; min-height: var(--tap); margin-top: 12px; padding: 7px 8px; border-radius: var(--radius);
+    background: var(--row-b); border: 1px solid rgba(246, 236, 212, .6);
+    font-weight: 700; font-size: 14px;
+  }
+  .fav-btn.fav-side:hover { transform: none; filter: brightness(1.15); }
+  .fav-btn.fav-side[aria-pressed="true"] { color: var(--cream); }          /* texto legível; só o ícone fica rosa */
+  .fav-btn.fav-side[aria-pressed="true"] svg { color: #ff5a7a; }
+
+  .fav-sub { color: var(--text-2); font-size: 16px; margin: -16px 0 22px; }
+  .fav-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; }
+  .fav-card { display: flex; flex-direction: column; background: var(--card); border-radius: 5px; padding: 8px; transition: transform .2s, filter .2s; }
+  .fav-card:hover { transform: translateY(-4px); filter: brightness(1.1); }
+  .fav-card .cover-lg { width: 100%; aspect-ratio: 2 / 3; border-radius: 3px; background-color: #c8d0da; background-size: cover; background-position: center; }
+  .fav-card h2 { font-size: 16px; line-height: 1.1; margin: 8px 2px 2px; }
+  .fav-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: auto 2px 0; padding-top: 6px; }
+  .fav-foot .m { font-size: 14px; color: var(--text-soft); }
+  .fav-foot .m b { color: var(--cream); }
+  .empty-box { background: var(--row-a); border-radius: var(--radius); padding: 34px 22px; text-align: center; font-size: 18px; line-height: 1.4; }
+  .empty-box p + p { margin-top: 8px; font-size: 16px; color: var(--text-2); }
+
+  /* ===== SOBRE ===== */
+  .about { max-width: 820px; }
+  .about section { background: var(--row-a); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; }
+  .about h2 { font-size: 22px; color: var(--muted); margin-bottom: 8px; }
+  .about p, .about li { font-family: 'Roboto', sans-serif; font-weight: 300; font-size: 16px; line-height: 1.55; color: var(--text-2); }
+  .about p + p, .about ul, .about ol, .about .formula { margin-top: 10px; }
+  .about ul, .about ol { padding-left: 22px; }
+  .about li + li { margin-top: 6px; }
+  .about .formula { font-family: 'Roboto', sans-serif; background: var(--row-b); border-radius: var(--radius); padding: 10px 12px; font-size: 15px; color: var(--cream); overflow-x: auto; }
+  .about b { color: var(--cream); font-weight: 700; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; z-index: 100;
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    background: var(--header); color: var(--cream); font-weight: 700; font-size: 16px;
+    padding: 10px 18px; border-radius: var(--radius); border: 1px solid rgba(246, 236, 212, .4);
+    transition: opacity .25s, transform .25s; max-width: calc(100vw - 24px); text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ===== Notícias ===== */
+  aside { background: var(--news-panel); border-radius: var(--radius); padding: 10px 9px 16px; align-self: start; }
+  aside h2 { color: var(--news-title); font-size: 26px; margin: 0 0 8px 2px; }
+  .news-item { display: block; position: relative; height: 170px; margin-bottom: 24px; border-radius: 4px; overflow: hidden; background-size: cover; background-position: center; }
+  .news-item:last-child { margin-bottom: 0; }
+  .news-item > span { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px 8px 6px; font-weight: 700; font-size: 15px; line-height: 1.12; background: linear-gradient(transparent, rgba(0, 0, 0, .88)); }
+  .news-item:hover { filter: brightness(1.1); }
+  .news-item small { display: block; margin-top: 3px; font-size: 12px; font-weight: 400; color: var(--text-2); }
+  .news-src { margin: 0 2px 10px; font-size: 13px; line-height: 1.3; color: var(--news-title); }
+
+  .site-footer { max-width: 1440px; margin: 0 auto; padding: 0 12px 36px; font-size: 13px; line-height: 1.45; color: var(--text-2); text-align: center; }
+  .site-footer a { display: inline-block; min-height: 24px; padding: 3px 6px; color: var(--cream); text-decoration: underline; }
+
+  /* ===== Imagens de exemplo (substitua por suas próprias) =====
+     Para usar imagens reais, preencha o campo "cover" de cada anime no script,
+     ou troque o gradiente por: url('caminho/imagem.jpg')  */
+  .g1 { background-image: linear-gradient(160deg, #e7c28d 0%, #b97d52 45%, #5f7f8c 100%); }
+  .g2 { background-image: linear-gradient(160deg, #2b3a67, #7a4d8c 60%, #c96b8f); }
+  .g3 { background-image: linear-gradient(160deg, #1b3b52, #3a7ca5 60%, #bfe3f0); }
+  .g4 { background-image: linear-gradient(160deg, #5c2a3a, #b0486a 60%, #f0b27a); }
+  .g5 { background-image: linear-gradient(160deg, #1f2d3d, #4b6584 60%, #a5b1c2); }
+  .g6 { background-image: linear-gradient(160deg, #e17055, #fdcb6e 70%); }
+  .g7 { background-image: linear-gradient(160deg, #6c5ce7, #a29bfe 60%, #fd79a8); }
+  .g8 { background-image: linear-gradient(160deg, #00695c, #4db6ac 60%, #e0f2f1); }
+  .g9 { background-image: linear-gradient(160deg, #3a1c71, #d76d77, #ffaf7b); }
+  .g10 { background-image: linear-gradient(160deg, #134e5e, #71b280); }
+
+  /* =====================================================================
+     TELAS A PARTIR DE 380px — o nome da marca volta a aparecer no cabeçalho
+     ===================================================================== */
+  @media (min-width: 380px) {
+    .logo-text { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; }
+  }
+
+  /* =====================================================================
+     520px+ — gêneros em 3 colunas
+     ===================================================================== */
+  @media (min-width: 520px) {
+    .genres-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 20px; }
+    .genre-card { padding: 8px; }
+    .genre-img span { padding: 8px 10px 7px; font-size: clamp(15px, 1.4vw, 22px); }
+  }
+
+  /* =====================================================================
+     640px+ — tablet: cabeçalho em uma linha, layouts de "desktop" nos conteúdos
+     ===================================================================== */
+  @media (min-width: 640px) {
+    :root { --score-w: 130px; }
+
+    .site-header {
+      grid-template-columns: auto auto minmax(0, 1fr) auto;
+      grid-template-areas: "menu logo search user";
+      gap: 8px 14px; padding: 6px 16px;
+    }
+    .search { max-width: 440px; }
+    .auth-link { font-size: 16px; padding: 0 12px; }
+    .profile span { display: inline; }
+
+    main { padding: 20px 28px 48px; }
+    main.wide { padding-top: 0; }
+    main.full { padding-top: 14px; }
+    .site-footer { padding: 0 28px 36px; }
+
+    .hero { grid-template-columns: 1fr minmax(270px, 28%); height: clamp(250px, 24vw, 400px); }
+    .hero-img { height: auto; }
+    .hero-info { padding: 20px 20px 16px; }
+    .hero-info p { padding-right: 36px; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }   /* a altura do destaque é fixa: limita a sinopse */
+    .hero-next { top: 50%; bottom: auto; right: 4px; transform: translateY(-50%); }
+    .fav-btn.fav-hero { right: 16px; bottom: 14px; }
+
+    .top-item { flex-basis: clamp(270px, 20vw, 350px); height: clamp(175px, 12.5vw, 225px); }
+    .top-card h3 { font-size: clamp(16px, 1.2vw, 20px); }
+    .top-card p { font-size: clamp(12px, 0.78vw, 13px); -webkit-line-clamp: 5; }
+    .top-card .info { padding-bottom: 46px; }
+    .trailer-card { flex-basis: clamp(240px, 18vw, 320px); }
+    .thumb { height: clamp(135px, 10vw, 180px); }
+    .play { width: clamp(56px, 4vw, 72px); height: clamp(56px, 4vw, 72px); }
+    .badge { font-size: clamp(14px, 1.15vw, 20px); }
+    .trailer-card h3 { font-size: clamp(14px, 0.95vw, 16px); }
+
+    .rank-grid { --cols: 76px 92px minmax(0, 1fr) var(--score-w) var(--score-w) var(--score-w); }
+    .rank-head { padding: 64px 0 10px; }
+    .rank-head h1 { font-size: 28px; padding-left: 14px; }
+    .rank-head .col-label { font-size: 26px; }
+    .row { min-height: 110px; }
+    .row-pos { font-size: 64px; align-items: center; padding-top: 0; }
+    .row-pos[data-d="2"] { font-size: 56px; }
+    .row-pos[data-d="3"] { font-size: 38px; letter-spacing: -1px; }
+    .cover { width: 76px; height: 88px; }
+    .row-name { padding: 8px 64px 8px 4px; }
+    .row-name .t { font-size: 24px; }
+    .row-name .m { font-size: 14px; }
+    .score-cell { font-size: 30px; }
+    .fav-btn.icon { width: 36px; height: 36px; }
+    .fav-btn.fav-row { left: auto; bottom: 0; top: 0; margin: auto 0; width: 36px; height: 36px; right: calc(var(--score-w) * 3 + 14px); }
+    .fav-btn.fav-row svg { width: 20px; height: 20px; }
+    .fav-btn.fav-hero { width: 40px; height: 40px; }
+    .fav-btn.fav-inline { width: 40px; height: 40px; }
+
+    .detail { grid-template-columns: 220px minmax(0, 1fr); padding: 22px; }
+    .detail-side { width: 220px; }
+    .detail .big-cover { width: 220px; height: 310px; }
+    .detail h1 { font-size: 38px; }
+    .fav-btn.fav-side { font-size: 16px; padding: 9px 12px; }
+
+    .auth-card { margin-top: 40px; padding: 26px; }
+    .profile-head { padding: 22px; gap: 22px; }
+    .profile-head .avatar-lg { width: 96px; height: 96px; flex-basis: 96px; }
+    .profile-head h1 { font-size: 34px; }
+    .settings-panel { padding: 22px; }
+    .setting { flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; }
+    .setting input[type="text"], .setting select { width: auto; min-width: 240px; }
+
+    .fav-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 26px 20px; }
+    .fav-card h2 { font-size: 18px; }
+    .about section { padding: 22px; }
+    aside h2 { font-size: 30px; }
+    .news-item { height: clamp(160px, 11.5vw, 210px); }
+  }
+
+  /* =====================================================================
+     1000px+ — duas colunas (conteúdo + notícias), 4 cards de nota, 6 gêneros
+     ===================================================================== */
+  @media (min-width: 1000px) {
+    main, main.wide { grid-template-columns: minmax(0, 1fr) 340px; gap: 40px; }
+    main.full { grid-template-columns: minmax(0, 1fr); }
+    main.wide aside { margin-top: 30px; }
+    .strip-arrow { right: -34px; width: 32px; height: var(--tap); border-radius: 0; background: none; font-size: 28px; }
+    .detail-scores { grid-template-columns: repeat(4, 1fr); }
+    .genres-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 36px 24px; }
+  }
+
+  /* =====================================================================
+     1120px+ — o menu fica aberto no cabeçalho (sem botão de menu)
+     ===================================================================== */
+  @media (min-width: 1120px) {
+    .site-header { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "logo nav search user"; gap: 8px 20px; padding: 6px 18px; }
+    .menu-toggle { display: none; }
+    .logo { font-size: 26px; }
+    .site-nav { grid-area: nav; display: flex; position: static; flex-direction: row; gap: 4px; padding: 0; background: none; border: 0; box-shadow: none; }
+    .site-nav a { min-height: 40px; font-size: 17px; padding: 0 12px; }
+    .search { height: 38px; max-width: 400px; }
+    .search-btn { height: 34px; }
+    .auth-link, .logout-btn, .profile { min-height: 40px; }
+    .profile span { max-width: 170px; }
+  }
+
+  @media (min-width: 1700px) { .top-card p { -webkit-line-clamp: 6; } .hero-info p { -webkit-line-clamp: 8; } }
+
+  /* =====================================================================
+     Movimento reduzido: pelo sistema operacional OU pela configuração do Kanshō
+     ===================================================================== */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+  html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+
+  /* ===== PARA VOCÊ: gêneros favoritos e recomendações ===== */
+  .pref-panel { background: var(--row-a); border-radius: var(--radius); padding: 14px; margin-bottom: 26px; }
+  .pref-panel h2 { font-size: 22px; color: var(--muted); padding-bottom: 4px; border-bottom: 4px solid var(--card); margin-bottom: 8px; }
+  .pref-panel .hint, .reco-sub { font-size: 14px; color: var(--text-2); line-height: 1.35; }
+  .pref-group { margin-top: 14px; }
+  .pref-group h3 { font-size: 15px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+  .chip-set { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pref-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 14px; }
+  .link-btn { min-height: var(--tap); padding: 0 4px; color: var(--cream); font-weight: 700; text-decoration: underline; }
+  .link-btn:hover { color: #fff; }
+  .link-btn[disabled] { opacity: .5; text-decoration: none; cursor: default; }
+  .reco-head { font-size: clamp(18px, 1.4vw, 24px); font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+  .reco-sub { margin-bottom: 16px; }
+  .reco-why { font-size: 13px; line-height: 1.25; color: var(--text-soft); margin: 4px 2px 0; }
+  .reco-more { display: flex; justify-content: center; margin-top: 22px; }
+  .home-reco-cta { padding: 20px 18px; font-size: 16px; }
+
+  /* com o link "Para você" o menu fica mais largo: entre 1120 e 1299px ele é compactado para a busca não ser espremida */
+  @media (min-width: 1120px) and (max-width: 1299px) {
+    .site-header { column-gap: 12px; }
+    .site-nav { gap: 0; }
+    .site-nav a { font-size: 15px; padding: 0 8px; }
+    .logo { font-size: 22px; }
+    .profile span { max-width: 100px; }
+  }
+</style>
+</head>
+
+<body>
+
+<a class="skip-link" href="#main" id="skipLink">Pular para o conteúdo</a>
+
+<!-- ===== CABEÇALHO ===== -->
+<header class="site-header">
+  <button type="button" class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="siteNav" aria-label="Abrir menu">
+    <svg class="ico-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    <svg class="ico-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+  </button>
+  <a href="#/" class="logo" aria-label="Kanshō — página inicial">
+    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="7" fill="#9b1b3a"/><path fill="#ff8c00" d="M16 5.5L18.76 12.7 26.46 13.1 20.47 17.95 22.47 25.4 16 21.2 9.53 25.4 11.53 17.95 5.54 13.1 13.24 12.7Z"/></svg>
+    <span class="logo-text">KANSHŌ</span>
+  </a>
+  <nav class="site-nav" id="siteNav" aria-label="Principal">
+    <a href="#/mais-votados" id="navRank">Mais votados</a>
+    <a href="#/generos" id="navGenres">Gêneros</a>
+    <a href="#/para-voce" id="navForYou">Para você</a>
+    <a href="#/favoritos" id="navFavs">Favoritos</a>
+    <a href="#/perfil" id="navSettings">Configurações</a>
+    <a href="#/sobre" id="navAbout">Sobre</a>
+  </nav>
+  <form class="search" id="searchForm" role="search" autocomplete="off">
+    <label for="searchInput" class="sr-only">Buscar animes por título, gênero ou estúdio</label>
+    <input type="search" id="searchInput" placeholder="Buscar animes..." role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchList" enterkeyhint="search">
+    <button type="submit" class="search-btn" aria-label="Buscar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+    </button>
+    <ul class="search-list" id="searchList" role="listbox" aria-label="Sugestões" hidden></ul>
+  </form>
+  <div class="user-area">
+    <a href="#/login" class="auth-link" id="navLogin">Entrar</a>
+    <a href="#/cadastro" class="auth-link signup" id="navRegister">Cadastrar</a>
+    <a href="#/perfil" class="profile" id="navProfile" title="Meu perfil" aria-label="Meu perfil" hidden><div class="avatar"></div><span id="navUserName"></span></a>
+    <button type="button" class="logout-btn" id="logoutBtn" hidden>Sair</button>
+  </div>
+</header>
+<div class="data-banner" id="dataBanner" role="status" hidden></div>
+
+<main id="main" tabindex="-1">
+  <div class="col-main">
+
+    <!-- ========== TELA: INÍCIO ========== -->
+    <div class="view active" id="view-home">
+      <h1 class="sr-only">Kanshō: as notas de animes do IMDb, MyAnimeList e AniList em um só lugar</h1>
+      <section class="hero" aria-roledescription="carrossel" aria-label="Destaques">
+        <div class="hero-img g1" id="heroImg">
+          <div class="dots" id="dots">
+            <button type="button" class="dot active" aria-label="Destaque 1"></button>
+            <button type="button" class="dot" aria-label="Destaque 2"></button>
+            <button type="button" class="dot" aria-label="Destaque 3"></button>
+          </div>
+        </div>
+        <button type="button" class="hero-pause" id="heroPause" aria-label="Pausar a troca automática de destaques">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="ic-pause" d="M7 5h4v14H7zM13 5h4v14h-4z"/><path class="ic-play" d="M8 5l11 7-11 7z"/></svg>
+        </button>
+        <div class="hero-info">
+          <h2><a id="heroTitle" href="#/anime/jojo">JoJo's Bizarre Adventure: Steel Ball Run</a></h2>
+          <p id="heroDesc"></p>
+          <div class="scores" id="heroScores"></div>
+          <div id="heroFav"></div>
+          <button type="button" class="hero-next" id="heroNext" aria-label="Próximo destaque">▶</button>
+        </div>
+      </section>
+
+      <h2 class="section-title">Top 10 em alta</h2>
+      <div class="strip-wrap">
+        <div class="strip" id="topStrip"></div>
+        <button type="button" class="strip-arrow" data-target="topStrip" aria-label="Ver mais do Top 10">▶</button>
+      </div>
+
+      <section id="homeReco" aria-labelledby="homeRecoTitle" hidden>
+        <h2 class="section-title" id="homeRecoTitle">Recomendados para você</h2>
+        <div id="homeRecoBody"></div>
+      </section>
+
+      <h2 class="section-title">Trailers dos animes em alta</h2>
+      <div class="strip-wrap">
+        <div class="strip" id="trailerStrip"></div>
+        <button type="button" class="strip-arrow" data-target="trailerStrip" aria-label="Ver mais trailers">▶</button>
+      </div>
+    </div>
+
+    <!-- ========== TELA: MAIS VOTADOS ========== -->
+    <div class="view" id="view-rank">
+      <div class="rank-grid rank-head">
+        <h1>Mais Votados</h1>
+        <div class="col-label">IMDB</div>
+        <div class="col-label">MAL</div>
+        <div class="col-label">AniList</div>
+      </div>
+      <div class="rank-sort" role="group" aria-label="Ordenar o ranking">
+        <span id="sortLabel">Ordenar por:</span>
+        <button type="button" class="sort-btn" data-sort="score" aria-pressed="true">Média Kanshō</button>
+        <button type="button" class="sort-btn" data-sort="pop" aria-pressed="false">Popularidade</button>
+      </div>
+      <div id="rankList"></div>
+      <nav class="pager" id="rankPager" aria-label="Páginas do ranking" hidden></nav>
+      <p class="note" id="rankNote"></p>
+    </div>
+
+    <!-- ========== TELA: GÊNEROS ========== -->
+    <div class="view" id="view-genres">
+      <h1 class="genres-title">Gêneros</h1>
+      <div class="genres-grid" id="genresGrid"></div>
+    </div>
+
+    <!-- ========== TELA: UM GÊNERO ========== -->
+    <div class="view" id="view-genre">
+      <div id="genreBox"></div>
+    </div>
+
+    <!-- ========== TELA: BUSCA ========== -->
+    <div class="view" id="view-search">
+      <div id="searchBox"></div>
+    </div>
+
+    <!-- ========== TELA: PÁGINA DO ANIME ========== -->
+    <div class="view" id="view-detail">
+      <a href="#/mais-votados" class="back">← Voltar para Mais votados</a>
+      <div id="detailBox"></div>
+    </div>
+
+    <!-- ========== TELA: PERFIL ========== -->
+    <div class="view" id="view-profile">
+      <div id="profileBox"></div>
+    </div>
+
+    <!-- ========== TELA: PARA VOCÊ ========== -->
+    <div class="view" id="view-foryou">
+      <div id="forYouBox"></div>
+    </div>
+
+    <!-- ========== TELA: FAVORITOS ========== -->
+    <div class="view" id="view-favs">
+      <div id="favsBox"></div>
+    </div>
+
+    <!-- ========== TELA: SOBRE ========== -->
+    <div class="view" id="view-about">
+      <article class="about">
+        <h1 class="genres-title">Sobre o Kanshō</h1>
+
+        <section>
+          <h2>O que é</h2>
+          <p>Kanshō (鑑賞, “apreciar”) é um agregador de avaliações de animes. Em vez de abrir três sites para comparar notas, você vê as notas do <b>IMDb</b>, do <b>MyAnimeList</b> e do <b>AniList</b> lado a lado e uma única média por anime, que alimenta o ranking de Mais votados.</p>
+        </section>
+
+        <section>
+          <h2>O diferencial: uma média justa</h2>
+          <p>Uma média simples engana: um anime com 300 votos e nota 9,8 passaria à frente de um clássico com 300 mil votos e nota 9,0. A <b>Média Kanshō</b> corrige isso em duas etapas:</p>
+          <ol>
+            <li>Cada nota é ajustada de acordo com o número de votos <i>da própria fonte</i>: quanto menos votos, mais a nota é puxada para a média geral daquela fonte.</li>
+            <li>A média final é a média simples das notas ajustadas das fontes que têm nota para o anime. Se uma fonte não avaliou o título, ela é ignorada.</li>
+          </ol>
+          <p class="formula">nota ajustada = v/(v+m) × nota + m/(v+m) × C<br>v = votos do anime · m = mediana de votos da fonte no catálogo · C = nota média da fonte no catálogo</p>
+          <p>Exemplo com C = 8,0 e m = 100 mil votos: nota 9,8 com 300 votos vira <b>8,01</b>; nota 9,0 com 300 mil votos vira <b>8,75</b>. Em <a href="#/perfil">Configurações</a> você pode trocar para a média simples, se preferir.</p>
+        </section>
+
+        <section>
+          <h2>O que você pode fazer aqui</h2>
+          <ul>
+            <li>Ver o <a href="#/mais-votados">ranking de Mais votados</a> e abrir a página de cada anime com as notas de cada fonte.</li>
+            <li>Explorar os <a href="#/generos">gêneros</a> e usar a busca do topo para achar um título, gênero ou estúdio.</li>
+            <li>Criar uma conta para salvar seus <a href="#/favoritos">favoritos</a> e ajustar o critério da média, o carrossel e as animações.</li>
+            <li>Escolher seus gêneros preferidos e receber sugestões personalizadas em <a href="#/para-voce">Para você</a>.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Como funcionam as recomendações</h2>
+          <p>Cada anime tem uma lista de gêneros e estilos (Ação, Fantasia, Seinen, Isekai…). Os gêneros que você escolhe em <a href="#/para-voce">Para você</a> valem mais; cada anime que você favorita também reforça os gêneros dele. O Kanshō compara esse perfil com todos os títulos do catálogo e ordena os que mais combinam, dando um pequeno bônus aos de nota mais alta. Animes já favoritados não aparecem, e cada sugestão mostra o motivo. Tudo é calculado no seu navegador, a partir de dados salvos apenas nele.</p>
+        </section>
+
+        <section>
+          <h2>Fontes e créditos</h2>
+          <p>O catálogo reúne uma seleção fixa de clássicos e até 200 dos animes mais populares e em alta no AniList, atualizados enquanto a página está aberta; o ranking é exibido de 50 em 50. Para respeitar os limites das APIs, as notas ficam em cache por 24 horas; a primeira visita leva alguns minutos para completar o MyAnimeList, e as notas aparecem aos poucos. Notas e capas vêm do AniList, do MyAnimeList (por meio de uma API não oficial) e do IMDb (por meio da API OMDb). As sinopses dos títulos acrescentados automaticamente vêm em inglês e são traduzidas para o português, de forma automática, quando aparecem nos destaques ou quando o título é aberto. Todos os dados pertencem às respectivas fontes; o Kanshō não é afiliado a nenhuma delas. Quando as fontes não respondem, o site usa as últimas notas salvas no navegador ou valores de exemplo, e avisa você no topo da página.</p>
+        </section>
+
+        <section>
+          <h2>Sobre este protótipo</h2>
+          <p>As contas, os favoritos e as configurações ficam salvos apenas neste navegador (a senha é guardada somente como hash). Para uso real, essas funções precisam de um servidor. Os trailers vêm do AniList e as notícias da página inicial, de uma API não oficial do MyAnimeList; se não carregarem, a página mostra exemplos que levam a buscas externas.</p>
+        </section>
+      </article>
+    </div>
+
+    <!-- ========== TELA: ENTRAR ========== -->
+    <div class="view" id="view-login">
+      <form class="auth-card" id="loginForm" novalidate>
+        <h1>Entrar</h1>
+        <p class="sub">Acesse sua conta do Kanshō.</p>
+        <div class="auth-error" id="loginError" role="alert"></div>
+        <div class="field">
+          <label for="loginUser">Nome de usuário</label>
+          <input id="loginUser" type="text" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="loginPass">Senha</label>
+          <input id="loginPass" type="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn-save">Entrar</button>
+        <p class="auth-switch">Ainda não tem conta? <a href="#/cadastro">Cadastre-se</a></p>
+      </form>
+    </div>
+
+    <!-- ========== TELA: CADASTRO ========== -->
+    <div class="view" id="view-register">
+      <form class="auth-card" id="registerForm" novalidate>
+        <h1>Criar conta</h1>
+        <p class="sub">Cadastre-se para salvar seus favoritos e configurações.</p>
+        <div class="auth-error" id="registerError" role="alert"></div>
+        <div class="field">
+          <label for="regUser">Nome de usuário</label>
+          <input id="regUser" type="text" autocomplete="username" maxlength="20" required aria-describedby="regUserHint">
+          <div class="hint" id="regUserHint">De 3 a 20 caracteres: letras, números, ponto, hífen ou sublinhado.</div>
+        </div>
+        <div class="field">
+          <label for="regPass">Senha</label>
+          <input id="regPass" type="password" autocomplete="new-password" required aria-describedby="regPassHint">
+          <div class="hint" id="regPassHint">Mínimo de 8 caracteres.</div>
+        </div>
+        <div class="field">
+          <label for="regPass2">Confirmar senha</label>
+          <input id="regPass2" type="password" autocomplete="new-password" required>
+        </div>
+        <button type="submit" class="btn-save">Cadastrar</button>
+        <p class="auth-switch">Já tem conta? <a href="#/login">Entrar</a></p>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- ===== NOTÍCIAS (exemplos: cada item abre uma busca de notícias em nova aba) ===== -->
+  <aside aria-labelledby="newsTitle">
+    <h2 id="newsTitle">Notícias:</h2>
+    <p class="news-src" id="newsSrc"></p>
+    <div id="newsList"></div>
+  </aside>
+</main>
+<footer class="site-footer" id="siteFooter"></footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  /* =====================================================================
+     DADOS DOS ANIMES (catálogo)
+     - Aqui ficam só os dados editoriais (título em português, sinopse, gêneros,
+       estúdio...) e os IDENTIFICADORES de cada fonte. As notas e capas reais
+       são buscadas em tempo de execução (veja "FONTES DE DADOS" mais abaixo).
+     - malId: ID do anime no MyAnimeList (o número na URL myanimelist.net/anime/ID).
+       O AniList é consultado por esse mesmo ID, então um único número serve às duas fontes.
+     - imdbId: código do título no IMDb (ex.: tt0213338). Sem ele, usa-se imdbTitle
+       (busca por título + ano) e, na falta dos dois, o título e o ano do catálogo.
+     - sample: notas de EXEMPLO (escala 0–10), usadas somente quando não há
+       conexão com as fontes e não existe cache salvo.
+     - Para adicionar um anime, inclua um novo objeto na lista: ranking, página
+       individual e favoritos são gerados automaticamente.
+     - "cover": só é preciso preencher se quiser fixar uma capa própria;
+       normalmente a capa vem da API. Se ficar vazio, usa o gradiente "cls".
+     ===================================================================== */
+  /* "tags": categorias da tela Gêneros (shounen, shoujo, seinen, josei, kodomo, isekai, slice-of-life,
+     mecha, esportes, romance, sobrenatural, historico). "alt": outros nomes, usados só na busca.
+     Os "sample" dos títulos mais recentes são valores aproximados, usados apenas sem conexão e sem cache. */
+  const animes = [
+    { id: 'frieren', title: 'Sōsō no Frieren', alt: "Frieren Beyond Journey's End", year: 2023, studio: 'Madhouse', eps: 28,
+      genres: ['Aventura', 'Drama', 'Fantasia'], tags: ['shounen'], malId: 52991, imdbId: 'tt22248376', sample: { imdb: 9.3, mal: 9.3, ani: 9.1 }, cls: 'g3', cover: '',
+      synopsis: 'Depois de derrotar o Rei Demônio, a maga elfa Frieren, que vive por séculos, percebe que mal conheceu os companheiros humanos da antiga jornada. Com a morte de um deles, ela parte em uma nova viagem para compreender melhor as pessoas e os sentimentos.' },
+
+    { id: 'fmab', title: 'Fullmetal Alchemist: Brotherhood', alt: 'FMA Hagane no Renkinjutsushi', year: 2009, studio: 'Bones', eps: 64,
+      genres: ['Ação', 'Aventura', 'Fantasia'], tags: ['shounen'], malId: 5114, imdbId: 'tt1355642', sample: { imdb: 9.1, mal: 9.1, ani: 8.8 }, cls: 'g6', cover: '',
+      synopsis: 'Dois irmãos alquimistas sofrem consequências terríveis ao tentar trazer a mãe de volta à vida. Em busca da Pedra Filosofal para reaver o que perderam, acabam descobrindo uma conspiração que ameaça todo o país.' },
+
+    { id: 'hxh', title: 'Hunter x Hunter (2011)', alt: 'HxH', year: 2011, studio: 'Madhouse', eps: 148,
+      genres: ['Ação', 'Aventura', 'Fantasia'], tags: ['shounen'], malId: 11061, imdbId: 'tt2098220', sample: { imdb: 9.0, mal: 9.0, ani: 8.9 }, cls: 'g10', cover: '',
+      synopsis: 'Gon, um garoto determinado, quer se tornar um Hunter para encontrar o pai. No caminho, enfrenta exames perigosos, faz amizades marcantes e se depara com adversários cada vez mais poderosos.' },
+
+    { id: 'steins', title: 'Steins;Gate', alt: 'Steins Gate', year: 2011, studio: 'White Fox', eps: 24,
+      genres: ['Ficção científica', 'Suspense'], tags: [], malId: 9253, imdbId: 'tt1910272', sample: { imdb: 8.8, mal: 9.1, ani: 8.8 }, cls: 'g5', cover: '',
+      synopsis: 'Um autoproclamado cientista maluco descobre, por acidente, uma forma de enviar mensagens ao passado. Seus experimentos logo trazem consequências cada vez mais graves para ele e seus amigos.' },
+
+    { id: 'jojo', title: "JoJo's Bizarre Adventure: Steel Ball Run", alt: 'Steel Ball Run: JoJo no Kimyou na Bouken · JoJo Jojos', year: 2026, studio: 'David Production',
+      genres: ['Aventura', 'Ação'], tags: ['seinen'], malId: 61469, imdbTitle: "JoJo's Bizarre Adventure: Steel Ball Run", sample: { imdb: 9.4, mal: 9.7, ani: 8.8 }, cls: 'g1', cover: '',
+      synopsis: 'Um ex-jóquei paraplégico une forças com um bandido para competir na primeira corrida de cavalos transcontinental da América do Norte, no século XIX.' },
+
+    { id: 'apothecary', title: 'Diários de uma Apotecária', alt: 'Kusuriya no Hitorigoto The Apothecary Diaries', year: 2023, studio: 'TOHO animation STUDIO / OLM',
+      genres: ['Drama', 'Mistério', 'Histórico'], tags: ['seinen', 'historico'], malId: 54492, imdbTitle: 'The Apothecary Diaries', sample: { imdb: 8.8, mal: 8.9, ani: 8.7 }, cls: 'g7', cover: '',
+      synopsis: 'Uma jovem com conhecimentos de farmacologia é vendida como serva no palácio do imperador. Em segredo, ela usa suas habilidades para desvendar mistérios médicos e casos de envenenamento.' },
+
+    { id: 'bebop', title: 'Cowboy Bebop', year: 1998, studio: 'Sunrise', eps: 26,
+      genres: ['Ação', 'Ficção científica'], tags: [], malId: 1, imdbId: 'tt0213338', sample: { imdb: 8.9, mal: 8.8, ani: 8.6 }, cls: 'g2', cover: '',
+      synopsis: 'Caçadores de recompensas viajam pelo sistema solar a bordo de uma nave, perseguindo criminosos enquanto tentam escapar dos próprios passados.' },
+
+    { id: 'aot', title: 'Shingeki no Kyojin', alt: 'Attack on Titan Ataque dos Titãs', year: 2013, studio: 'Wit Studio / MAPPA',
+      genres: ['Ação', 'Drama', 'Fantasia sombria'], tags: ['shounen'], malId: 16498, imdbId: 'tt2560140', sample: { imdb: 9.1, mal: 8.6, ani: 8.5 }, cls: 'g4', cover: '',
+      synopsis: 'A humanidade vive protegida por muralhas gigantescas contra titãs que devoram pessoas. Quando a proteção é rompida, um jovem jura exterminar todos eles.' },
+
+    { id: 'vinland', title: 'Vinland Saga', year: 2019, studio: 'Wit Studio / MAPPA',
+      genres: ['Ação', 'Aventura', 'Histórico'], tags: ['seinen', 'historico'], malId: 37521, imdbId: 'tt10233448', sample: { imdb: 8.8, mal: 8.7, ani: 8.7 }, cls: 'g9', cover: '',
+      synopsis: 'Na Europa do século XI, um jovem guerreiro viking busca vingança ao lado de mercenários e, aos poucos, passa a questionar o sentido da violência.' },
+
+    { id: 'jjk', title: 'Jujutsu Kaisen', year: 2020, studio: 'MAPPA',
+      genres: ['Ação', 'Sobrenatural'], tags: ['shounen', 'sobrenatural'], malId: 40748, imdbId: 'tt12343534', sample: { imdb: 8.6, mal: 8.6, ani: 8.5 }, cls: 'g8', cover: '',
+      synopsis: 'Yuji Itadori, estudante do ensino médio, tem a vida virada do avesso ao se envolver com um objeto amaldiçoado perigoso e passa a integrar o mundo dos feiticeiros.' },
+
+    /* ---- Títulos acrescentados para que cada gênero tenha pelo menos dois animes.
+            Os malId/imdbTitle foram conferidos de memória: se algum título aparecer com a nota de outro anime,
+            ajuste o identificador (o site ignora a fonte quando o ano retornado difere do "year" daqui). ---- */
+    { id: 'deathnote', title: 'Death Note', year: 2006, studio: 'Madhouse', eps: 37,
+      genres: ['Mistério', 'Suspense', 'Sobrenatural'], tags: ['shounen', 'sobrenatural'], malId: 1535, imdbTitle: 'Death Note', sample: { imdb: 9.0, mal: 8.6, ani: 8.4 }, cls: 'g5', cover: '',
+      synopsis: 'Um estudante brilhante encontra um caderno capaz de matar quem tiver o nome escrito nele. Decidido a criar um mundo sem crime, ele passa a ser perseguido por um detetive tão astuto quanto ele.' },
+
+    { id: 'kimetsu', title: 'Kimetsu no Yaiba', alt: 'Demon Slayer', year: 2019, studio: 'ufotable', eps: 26,
+      genres: ['Ação', 'Sobrenatural', 'Histórico'], tags: ['shounen', 'sobrenatural'], malId: 38000, imdbTitle: 'Demon Slayer: Kimetsu no Yaiba', sample: { imdb: 8.7, mal: 8.4, ani: 8.4 }, cls: 'g4', cover: '',
+      synopsis: 'Depois que sua família é morta por demônios e a irmã é transformada em um deles, o jovem Tanjiro entra para uma organização de caçadores para encontrar a cura e vingar os seus.' },
+
+    { id: 'haikyuu', title: 'Haikyuu!!', alt: 'Haikyu', year: 2014, studio: 'Production I.G', eps: 25,
+      genres: ['Esportes', 'Comédia', 'Drama'], tags: ['shounen', 'esportes'], malId: 20583, imdbTitle: 'Haikyu!!', sample: { imdb: 8.7, mal: 8.4, ani: 8.5 }, cls: 'g6', cover: '',
+      synopsis: 'Baixo para o vôlei, mas obstinado, Hinata sonha em jogar nas quadras. Ao se juntar ao time da escola Karasuno, aprende que o esporte se vence em equipe.' },
+
+    { id: 'slamdunk', title: 'Slam Dunk', year: 1993, studio: 'Toei Animation', eps: 101,
+      genres: ['Esportes', 'Comédia'], tags: ['shounen', 'esportes'], malId: 170, imdbTitle: 'Slam Dunk', sample: { imdb: 8.6, mal: 8.6, ani: 8.3 }, cls: 'g1', cover: '',
+      synopsis: 'Hanamichi Sakuragi, um delinquente rejeitado por todas as garotas, entra para o time de basquete do colégio para impressionar uma colega e descobre uma paixão verdadeira pelo esporte.' },
+
+    { id: 'fruitsbasket', title: 'Fruits Basket (2019)', year: 2019, studio: 'TMS Entertainment', eps: 25,
+      genres: ['Drama', 'Romance', 'Sobrenatural'], tags: ['shoujo', 'romance', 'sobrenatural'], malId: 38680, imdbTitle: 'Fruits Basket', sample: { imdb: 8.6, mal: 8.6, ani: 8.4 }, cls: 'g7', cover: '',
+      synopsis: 'Órfã, Tohru passa a morar com uma família que guarda um segredo: seus membros se transformam em animais do zodíaco chinês quando abraçados. Aos poucos, ela ajuda a curar as feridas de cada um.' },
+
+    { id: 'cardcaptor', title: 'Cardcaptor Sakura', alt: 'Sakura Card Captors', year: 1998, studio: 'Madhouse', eps: 70,
+      genres: ['Fantasia', 'Aventura', 'Romance'], tags: ['shoujo', 'kodomo'], malId: 232, imdbTitle: 'Cardcaptor Sakura', sample: { imdb: 8.2, mal: 8.2, ani: 8.0 }, cls: 'g7', cover: '',
+      synopsis: 'Ao libertar sem querer cartas mágicas de um livro misterioso, a menina Sakura assume a missão de recapturá-las, com a ajuda de um guardião e da melhor amiga.' },
+
+    { id: 'pokemon', title: 'Pokémon', year: 1997, studio: 'OLM', eps: 276,
+      genres: ['Aventura', 'Fantasia'], tags: ['kodomo'], malId: 527, imdbTitle: 'Pokémon', sample: { imdb: 7.6, mal: 7.4, ani: 7.0 }, cls: 'g8', cover: '',
+      synopsis: 'Ash parte em uma jornada pelo mundo dos Pokémon, capturando e treinando criaturas com o sonho de se tornar um Mestre Pokémon.' },
+
+    { id: 'monster', title: 'Monster', year: 2004, studio: 'Madhouse', eps: 74,
+      genres: ['Mistério', 'Suspense', 'Drama'], tags: ['seinen'], malId: 19, imdbTitle: 'Monster', sample: { imdb: 9.0, mal: 8.9, ani: 8.8 }, cls: 'g2', cover: '',
+      synopsis: 'Um neurocirurgião salva a vida de um garoto e, anos depois, descobre que ele se tornou um assassino frio. Para corrigir o erro, passa a persegui-lo pela Europa.' },
+
+    { id: 'nana', title: 'Nana', year: 2006, studio: 'Madhouse', eps: 47,
+      genres: ['Drama', 'Romance', 'Música'], tags: ['josei', 'romance', 'slice-of-life'], malId: 877, imdbTitle: 'Nana', sample: { imdb: 8.4, mal: 8.5, ani: 8.2 }, cls: 'g4', cover: '',
+      synopsis: 'Duas jovens com o mesmo nome e personalidades opostas se conhecem a caminho de Tóquio e passam a dividir um apartamento, entre a música, o amor e a vida adulta.' },
+
+    { id: 'chihayafuru', title: 'Chihayafuru', year: 2011, studio: 'Madhouse', eps: 25,
+      genres: ['Esportes', 'Drama', 'Romance'], tags: ['josei', 'esportes', 'romance'], malId: 10800, imdbTitle: 'Chihayafuru', sample: { imdb: 8.5, mal: 8.3, ani: 8.4 }, cls: 'g3', cover: '',
+      synopsis: 'Inspirada por um amigo de infância, Chihaya se dedica ao karuta competitivo, um jogo de cartas de poesia clássica, com o sonho de se tornar a melhor jogadora do Japão.' },
+
+    { id: 'rezero', title: 'Re:Zero − Começando uma Vida em Outro Mundo', alt: 'Re Zero Starting Life in Another World', year: 2016, studio: 'White Fox', eps: 25,
+      genres: ['Fantasia', 'Drama', 'Suspense'], tags: ['isekai'], malId: 31240, imdbTitle: 'Re:ZERO -Starting Life in Another World-', sample: { imdb: 8.2, mal: 8.2, ani: 8.1 }, cls: 'g10', cover: '',
+      synopsis: 'Transportado para outro mundo, Subaru descobre que morre e volta no tempo a cada fracasso. Preso a esse ciclo, precisa aprender com a dor para salvar quem ama.' },
+
+    { id: 'mushoku', title: 'Mushoku Tensei: Jobless Reincarnation', alt: 'Mushoku Tensei Reencarnação', year: 2021, studio: 'Studio Bind', eps: 11,
+      genres: ['Fantasia', 'Aventura', 'Drama'], tags: ['isekai'], malId: 39535, imdbTitle: 'Mushoku Tensei: Jobless Reincarnation', sample: { imdb: 8.3, mal: 8.3, ani: 8.2 }, cls: 'g9', cover: '',
+      synopsis: 'Um homem de 34 anos renasce em um mundo de magia e decide viver a nova chance sem repetir os erros da vida anterior.' },
+
+    { id: 'violet', title: 'Violet Evergarden', year: 2018, studio: 'Kyoto Animation', eps: 13,
+      genres: ['Drama', 'Fantasia'], tags: ['slice-of-life'], malId: 33352, imdbTitle: 'Violet Evergarden', sample: { imdb: 8.5, mal: 8.5, ani: 8.4 }, cls: 'g3', cover: '',
+      synopsis: 'Ex-soldado criada para a guerra, Violet trabalha como escritora de cartas e, ao traduzir sentimentos alheios em palavras, tenta entender as últimas palavras de seu comandante.' },
+
+    { id: 'bocchi', title: 'Bocchi the Rock!', year: 2022, studio: 'CloverWorks', eps: 12,
+      genres: ['Comédia', 'Música'], tags: ['slice-of-life'], malId: 47917, imdbTitle: 'Bocchi the Rock!', sample: { imdb: 8.9, mal: 8.8, ani: 8.7 }, cls: 'g6', cover: '',
+      synopsis: 'Hitori, uma adolescente extremamente tímida que toca guitarra sozinha em casa, é convidada para uma banda e tenta superar a ansiedade social no palco.' },
+
+    { id: 'eva', title: 'Neon Genesis Evangelion', alt: 'Shinseiki Evangelion', year: 1995, studio: 'Gainax / Tatsunoko', eps: 26,
+      genres: ['Ficção científica', 'Drama', 'Psicológico'], tags: ['mecha'], malId: 30, imdbTitle: 'Neon Genesis Evangelion', sample: { imdb: 8.5, mal: 8.4, ani: 8.3 }, cls: 'g2', cover: '',
+      synopsis: 'Um adolescente é convocado para pilotar um gigantesco robô e defender a humanidade de criaturas misteriosas, enquanto enfrenta a solidão e os próprios medos.' },
+
+    { id: 'codegeass', title: 'Code Geass: Lelouch of the Rebellion', alt: 'Code Geass Hangyaku no Lelouch', year: 2006, studio: 'Sunrise', eps: 25,
+      genres: ['Ação', 'Ficção científica', 'Drama'], tags: ['mecha'], malId: 1575, imdbTitle: 'Code Geass: Lelouch of the Rebellion', sample: { imdb: 8.7, mal: 8.7, ani: 8.6 }, cls: 'g5', cover: '',
+      synopsis: 'Lelouch ganha o poder de obrigar qualquer pessoa a obedecê-lo e o usa para liderar uma rebelião contra o império que dominou o Japão.' },
+
+    { id: 'kaguya', title: 'Kaguya-sama: Love Is War', alt: 'Kaguya sama wa Kokurasetai', year: 2019, studio: 'A-1 Pictures', eps: 12,
+      genres: ['Comédia', 'Romance'], tags: ['seinen', 'romance'], malId: 37999, imdbTitle: 'Kaguya-sama: Love Is War', sample: { imdb: 8.6, mal: 8.4, ani: 8.4 }, cls: 'g4', cover: '',
+      synopsis: 'Os dois melhores alunos do colégio se gostam, mas nenhum aceita confessar primeiro. Cada encontro vira uma batalha de estratégia para fazer o outro se declarar.' },
+
+    { id: 'champloo', title: 'Samurai Champloo', year: 2004, studio: 'Manglobe', eps: 26,
+      genres: ['Ação', 'Aventura', 'Histórico'], tags: ['historico'], malId: 205, imdbTitle: 'Samurai Champloo', sample: { imdb: 8.5, mal: 8.5, ani: 8.2 }, cls: 'g1', cover: '',
+      synopsis: 'No Japão do período Edo, uma garçonete, um ronin e um espadachim de estilo livre viajam juntos em busca do “samurai que cheira a girassóis”.' }
+  ];
+
+  /* ===== Utilitários ===== */
+  const byId = Object.fromEntries(animes.map(a => [a.id, a]));
+  /* Catálogo dinâmico (populares e em alta do AniList), preenchido por refreshCatalog() */
+  let catalogMeta = { trending: [], trailers: [], popularity: {}, items: {}, fetchedAt: 0 };
+  animes.forEach(a => { a.coverFixed = a.cover || ''; });   /* capa fixada à mão no catálogo; se existir, prevalece sobre a da API */
+  const SOURCES = ['imdb', 'mal', 'ani'];
+  let ranked = [...animes];   /* recalculado em computeScores(): primeiro os que têm nota (maior média primeiro), depois os sem nota */
+  const fmt = (n, d) => n == null ? '—' : n.toFixed(d).replace('.', ',');
+  const f1 = n => fmt(n, 1);
+  const f2 = n => fmt(n, 2);
+  const fmtVotes = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' mi'
+                      : n >= 1e3 ? Math.round(n / 1e3) + ' mil' : String(n);
+  /* Capa de reserva: se o anime não tem imagem (API fora do ar, sem cache), desenha-se uma capa em SVG com
+     as iniciais e o título. Quando há imagem real, ela fica por cima; se o link da imagem quebrar, a reserva aparece por baixo. */
+  const COVER_COLORS = {
+    g1: ['#e7c28d', '#b97d52', '#5f7f8c'], g2: ['#2b3a67', '#7a4d8c', '#c96b8f'], g3: ['#1b3b52', '#3a7ca5', '#bfe3f0'],
+    g4: ['#5c2a3a', '#b0486a', '#f0b27a'], g5: ['#1f2d3d', '#4b6584', '#a5b1c2'], g6: ['#e17055', '#f2a65a', '#fdcb6e'],
+    g7: ['#6c5ce7', '#a29bfe', '#fd79a8'], g8: ['#00695c', '#4db6ac', '#e0f2f1'], g9: ['#3a1c71', '#d76d77', '#ffaf7b'],
+    g10: ['#134e5e', '#4f9a82', '#71b280']
+  };
+  function unesc(t) { return String(t == null ? '' : t).replace(/&(amp|lt|gt|quot|#39);/g, (m, k) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" }[k])); }
+  const xmlEsc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const coverFallbacks = {};
+  function fallbackCover(a) {
+    if (coverFallbacks[a.id]) return coverFallbacks[a.id];
+    const stop = new Set(['de', 'da', 'do', 'das', 'dos', 'no', 'na', 'um', 'uma', 'os', 'as', 'of', 'the', 'a', 'o', 'e', 'to', 'in', 'and']);
+    const words = unesc(a.title).replace(/[:()!?;,.]/g, ' ').split(/\s+/).filter(Boolean);
+    const sig = words.filter(w => !stop.has(w.toLowerCase()));
+    const initials = (sig.length ? sig : words).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+    const lines = []; let cur = '';                      /* quebra o título em até 4 linhas de ~14 caracteres */
+    words.forEach(w => { if ((cur + ' ' + w).trim().length > 14 && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); });
+    if (cur) lines.push(cur);
+    if (lines.length > 4) { lines.length = 4; lines[3] = lines[3].replace(/.{0,2}$/, '') + '…'; }
+    const [c0, c1, c2] = COVER_COLORS[a.cls] || COVER_COLORS.g5;
+    const band = lines.length * 22 + 22;
+    const text = lines.map((l, k) => `<text x="100" y="${300 - band + 28 + k * 22}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="19" fill="#fff">${xmlEsc(l)}</text>`).join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300"><defs><linearGradient id="g" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" stop-color="${c0}"/><stop offset=".5" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>`
+      + `<rect width="200" height="300" fill="url(#g)"/><text x="100" y="${Math.round((300 - band) / 2 + 30)}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="84" fill="#fff" fill-opacity=".42">${xmlEsc(initials)}</text>`
+      + `<rect y="${300 - band}" width="200" height="${band}" fill="#000" fill-opacity=".6"/>${text}</svg>`;
+    return (coverFallbacks[a.id] = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+  }
+  const coverStyle = a => {
+    if (!a.title) return a.cover ? `style="background-image:url('${a.cover}')"` : '';   /* gêneros: só a imagem/gradiente */
+    return `style='background-image:${a.cover ? `url("${a.cover}"),` : ''}${fallbackCover(a)}'`;
+  };
+  const $ = id => document.getElementById(id);
+
+  const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+
+  /* Botão de coração. variant define a posição (ver CSS "Posição do botão em cada contexto"):
+     'hero' (destaque), 'top' (Top 10), 'row' (ranking), 'inline' (Favoritos) ou 'side' (página do anime, com texto) */
+  function heartBtn(a, variant) {
+    const cls = variant === 'side' ? 'fav-side' : 'icon fav-' + variant;
+    const text = variant === 'side' ? '<span class="txt">Favoritar</span>' : '';
+    return `<button type="button" class="fav-btn ${cls}" data-id="${a.id}" aria-pressed="false" aria-label="Favoritar: ${a.title}" title="Favoritar">${HEART_SVG}${text}</button>`;
+  }
+  let appReady = false;   /* vira true ao final do script (as funções de favoritos dependem de código definido mais abaixo) */
+
+  /* ===== Início: Top da semana ===== */
+  function synOf(a) { return a.synPt || a.synopsis; }   /* sinopse em português quando houver tradução guardada */
+  const WEEKLY_FALLBACK = ['apothecary', 'jjk', 'frieren', 'jojo', 'fmab', 'hxh'];
+  /* Top 10 em alta: ordem de "trending" do AniList; sem dados (offline), usa a seleção fixa */
+  function weeklyIds() {
+    const t = catalogMeta.trending.filter(id => byId[id]).slice(0, 10);
+    return t.length >= 6 ? t : WEEKLY_FALLBACK;
+  }
+  function renderTop() {
+    $('topStrip').innerHTML = weeklyIds().map((id, i) => {
+      const a = byId[id];
+      return `<div class="top-item">
+        <a href="#/anime/${a.id}" class="top-card">
+          <div class="poster ${a.cls}" ${coverStyle(a)} aria-hidden="true"><span class="rank">${i + 1}</span></div>
+          <div class="info"><h3>${a.title}</h3><p>${synOf(a)}</p></div>
+        </a>
+        ${heartBtn(a, 'top')}
+      </div>`;
+    }).join('');
+  }
+  renderTop();
+
+  /* ===== Trailers populares e notícias =====
+     Trailers: AniList (catálogo em alta). Notícias: API do MyAnimeList (veja loadExtras, mais abaixo). Enquanto não chegam, ou se falharem,
+     a página mostra estes exemplos, que levam a buscas externas (YouTube e Google Notícias) em nova aba. */
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  const extras = { trailers: null, news: null };
+  const yt = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q + ' trailer oficial');
+  const gnews = q => 'https://www.google.com/search?tbm=nws&q=' + encodeURIComponent(q);
+  const TRAILERS_FALLBACK = [
+    { title: 'Full Metal Alchemist: Brotherhood', badge: 'Full HD<br>Trailer', cls: 'g6', url: yt('Fullmetal Alchemist Brotherhood') },
+    { title: 'Tokyo Revengers Season 4', badge: 'Official<br>Trailer', cls: 'g5', url: yt('Tokyo Revengers Season 4') },
+    { title: 'ONE PIECE: Arco de Elbaf', badge: 'Trailer<br>Oficial', cls: 'g4', url: yt('One Piece Elbaf') },
+    { title: 'InuYasha: The Final Act', badge: 'Trailer', cls: 'g8', url: yt('InuYasha The Final Act') }
+  ];
+  const NEWS_FALLBACK = [
+    { title: 'Diários de uma Apotecária: 3ª temporada ganha trailer cheio de intrigas e com a música de encerramento', cls: 'g2', url: gnews('Diários de uma Apotecária 3ª temporada trailer') },
+    { title: "'Demons of the Shadow Realm' tem 2ª temporada confirmada", cls: 'g4', url: gnews('Demons of the Shadow Realm 2ª temporada') },
+    { title: 'Guerreiras Mágicas de Rayearth: Crunchyroll confirma transmissão de novo animê no Brasil', cls: 'g3', url: gnews('Guerreiras Mágicas de Rayearth Crunchyroll Brasil') }
+  ];
+
+  function renderTrailers() {
+    const real = (catalogMeta.trailers || []).filter(t => t && typeof t.yt === 'string' && /^[\w-]{11}$/.test(t.yt)).slice(0, 8).map(t => ({
+      title: String(t.title || 'Trailer'), url: 'https://www.youtube.com/watch?v=' + t.yt,
+      thumb: 'https://img.youtube.com/vi/' + t.yt + '/hqdefault.jpg', badge: 'Trailer' }));
+    const list = real.length ? real : TRAILERS_FALLBACK;
+    $('trailerStrip').innerHTML = list.map((t, i) => `
+      <a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" class="trailer-card">
+        <div class="thumb ${t.cls || 'g' + (i % 10 + 1)}" ${t.thumb ? `style="background-image:url('${esc(t.thumb)}')"` : ''}><div class="play" aria-hidden="true"></div><span class="badge" aria-hidden="true">${t.badge}</span></div>
+        <h3>${esc(t.title)}<span class="sr-only"> — assistir ao trailer no YouTube (abre em nova aba)</span></h3>
+      </a>`).join('');
+  }
+  function renderNews() {
+    const real = !!(extras.news && extras.news.length);
+    $('newsSrc').textContent = real ? 'Últimas do MyAnimeList, em inglês.' : 'Exemplos. As notícias reais aparecem quando a conexão permitir.';
+    $('newsList').innerHTML = (real ? extras.news : NEWS_FALLBACK).map(n => {
+      const a = n.animeId && byId[n.animeId];
+      const d = n.date ? new Date(n.date) : null;
+      const when = d && !isNaN(d) ? d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+      return `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer" class="news-item ${a ? a.cls : n.cls || 'g5'}" ${a ? coverStyle(a) : ''}>
+        <span>${esc(n.title)}${when ? `<small>${esc(when)}</small>` : ''}<span class="sr-only"> (abre em nova aba)</span></span></a>`;
+    }).join('');
+  }
+  renderTrailers();
+  renderNews();
+
+  /* ===== Início: carrossel =====
+     A troca automática respeita: a configuração "Carrossel automático", a preferência de movimento reduzido do
+     sistema, o botão de pausa, o mouse/foco sobre o destaque e a aba em segundo plano. */
+  const SLIDES_FALLBACK = ['jojo', 'jjk', 'frieren'];
+  let slideIds = SLIDES_FALLBACK;
+  function heroIds() {   /* destaques: os 3 primeiros em alta com banner E sinopse em português; completa com a seleção editorial */
+    if (catalogMeta.trending.length < 6) return SLIDES_FALLBACK;
+    const okBase = id => byId[id] && byId[id].banner && (!byId[id].dynamic || byId[id].synPt);
+    const hasImdb = id => !CONFIG.omdbKey || byId[id].imdb != null;   /* o destaque mostra a nota do IMDb: só entra título que a tem */
+    const pool = [...weeklyIds(), ...SLIDES_FALLBACK, ...animes.filter(a => !a.dynamic).map(a => a.id)];
+    const t = [];
+    [id => okBase(id) && hasImdb(id), id => okBase(id) || SLIDES_FALLBACK.includes(id)].forEach(rule =>   /* 2ª rodada: se o IMDb estiver fora do ar, completa sem esse requisito */
+      pool.forEach(id => { if (t.length < 3 && !t.includes(id) && byId[id] && rule(id)) t.push(id); }));
+    return t;
+  }
+  const heroImg = $('heroImg');
+  const heroEl = document.querySelector('.hero');
+  const dots = [...document.querySelectorAll('#dots .dot')];
+  let current = 0, timer = null, heroPaused = false, heroHover = false;
+  const reducedMotionOS = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const motionReduced = () => reducedMotionOS.matches || document.documentElement.classList.contains('reduce-motion');
+  const scrollBehavior = () => motionReduced() ? 'auto' : 'smooth';
+
+  function showSlide(i) {
+    current = (i + slideIds.length) % slideIds.length;
+    const a = byId[slideIds[current]];
+    heroImg.className = 'hero-img ' + a.cls;
+    const bg = a.banner || a.cover;   /* o banner (imagem larga do AniList) fica melhor no destaque que a capa vertical */
+    heroImg.style.backgroundImage = bg ? `url('${bg}')` : '';
+    $('heroTitle').textContent = unesc(a.title);
+    $('heroTitle').href = '#/anime/' + a.id;
+    $('heroDesc').textContent = unesc(synOf(a));
+    $('heroScores').innerHTML = `IMDB: ${f1(a.imdb)}<br>MAL: ${f1(a.mal)}<br>ANI: ${f1(a.ani)}`;
+    $('heroFav').innerHTML = heartBtn(a, 'hero');
+    if (appReady) refreshFavButtons();
+    dots.forEach((d, k) => {
+      d.classList.toggle('active', k === current);
+      d.setAttribute('aria-label', 'Destaque ' + (k + 1) + ': ' + unesc(byId[slideIds[k]].title));
+      if (k === current) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current');
+    });
+  }
+  const carouselAllowed = () => { const p = getPrefs(); return !!p.carousel && !p.reduceMotion && !reducedMotionOS.matches; };
+  function restartTimer() {
+    clearInterval(timer); timer = null;
+    if (carouselAllowed() && !heroPaused && !heroHover && !document.hidden) timer = setInterval(() => showSlide(current + 1), 6000);
+  }
+  function updatePauseButton() {
+    const b = $('heroPause');
+    b.hidden = !carouselAllowed();
+    b.dataset.state = heroPaused ? 'paused' : 'playing';
+    b.setAttribute('aria-label', heroPaused ? 'Retomar a troca automática de destaques' : 'Pausar a troca automática de destaques');
+  }
+  $('heroPause').addEventListener('click', () => { heroPaused = !heroPaused; updatePauseButton(); restartTimer(); });
+  heroEl.addEventListener('mouseenter', () => { heroHover = true; restartTimer(); });
+  heroEl.addEventListener('mouseleave', () => { heroHover = false; restartTimer(); });
+  heroEl.addEventListener('focusin', () => { heroHover = true; restartTimer(); });
+  heroEl.addEventListener('focusout', () => { heroHover = false; restartTimer(); });
+  document.addEventListener('visibilitychange', restartTimer);
+  reducedMotionOS.addEventListener('change', () => { updatePauseButton(); restartTimer(); });
+  $('heroNext').addEventListener('click', () => { showSlide(current + 1); restartTimer(); });
+  dots.forEach((d, k) => d.addEventListener('click', () => { showSlide(k); restartTimer(); }));
+  showSlide(0);
+
+  document.querySelectorAll('.strip-arrow').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const strip = $(btn.dataset.target);
+      strip.scrollBy({ left: 400, behavior: scrollBehavior() });
+      if (strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 5) strip.scrollTo({ left: 0, behavior: scrollBehavior() });
+    });
+  });
+
+  /* ===== Mais votados ===== */
+  const RANK_PAGE_SIZE = 50;   /* linhas por página no ranking */
+  let rankPage = 1;
+  let rankMode = 'score';   /* 'score' = Média Kanshō | 'pop' = popularidade (nº de listas no AniList) */
+  function renderRank() {
+    const pop = rankMode === 'pop';
+    const all = pop ? [...animes].sort((x, y) => (y.popularity ?? -1) - (x.popularity ?? -1) || x.title.localeCompare(y.title)) : ranked;
+    const size = RANK_PAGE_SIZE, pages = Math.max(1, Math.ceil(all.length / size));
+    rankPage = Math.min(Math.max(1, rankPage), pages);
+    const off = (rankPage - 1) * size, list = all.slice(off, off + size);
+    $('rankList').innerHTML = list.map((a, k) => { const i = off + k; return `
+      <div class="row-wrap">
+      <a href="#/anime/${a.id}" class="rank-grid row" title="Ver página de ${a.title}">
+        <div class="row-pos" data-d="${String((pop ? a.popularity != null : a.score != null) ? i + 1 : 1).length}">${(pop ? a.popularity != null : a.score != null) ? i + 1 : '–'}</div>
+        <div class="row-cover-box"><div class="cover ${a.cls}" ${coverStyle(a)} aria-hidden="true"></div></div>
+        <div class="row-name">
+          <div class="t">${a.title}</div>
+          <div class="m">Média: <b>${f2(a.score)}</b>${pop && a.popularity != null ? ` · em ${fmtVotes(a.popularity)} listas` : ''}</div>
+        </div>
+        <div class="score-cell">${f1(a.imdb)}</div>
+        <div class="score-cell">${f1(a.mal)}</div>
+        <div class="score-cell">${f1(a.ani)}</div>
+      </a>
+      ${heartBtn(a, 'row')}
+      </div>`; }).join('');
+    const nav = $('rankPager');
+    nav.hidden = pages <= 1;
+    nav.innerHTML = pages <= 1 ? '' : `<button type="button" class="pg-btn" data-pg="prev"${rankPage === 1 ? ' disabled' : ''}>‹ Anterior</button>
+      <span class="pg-info" aria-live="polite">Página ${rankPage} de ${pages} · ${off + 1} a ${off + list.length} de ${all.length} animes</span>
+      <button type="button" class="pg-btn" data-pg="next"${rankPage === pages ? ' disabled' : ''}>Próxima ›</button>`;
+  }
+  renderRank();
+  document.querySelector('.rank-sort').addEventListener('click', e => {
+    const b = e.target.closest('.sort-btn');
+    if (!b) return;
+    rankMode = b.dataset.sort === 'pop' ? 'pop' : 'score'; rankPage = 1;
+    document.querySelectorAll('.sort-btn').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    renderRank(); updateRankNote(); if (appReady) refreshFavButtons();
+  });
+
+  $('rankPager').addEventListener('click', e => {
+    const b = e.target.closest('.pg-btn');
+    if (!b || b.disabled) return;
+    const dir = b.dataset.pg;
+    rankPage += dir === 'next' ? 1 : -1;
+    renderRank(); if (appReady) refreshFavButtons();
+    const again = $('rankPager').querySelector(`[data-pg="${dir}"]`);
+    (again && !again.disabled ? again : $('rankPager').querySelector('.pg-btn:not(:disabled)') || $('main')).focus({ preventScroll: true });
+    $('view-rank').scrollIntoView({ block: 'start' });
+  });
+
+  /* ===== Página individual do anime ===== */
+  function renderDetail(id) {
+    const a = byId[id];
+    if (!a) {
+      $('detailBox').innerHTML = `<div class="detail" style="display:block"><h1>Anime não encontrado</h1>
+        <p class="synopsis" style="margin-top:10px">Não localizamos este título. Volte ao ranking para escolher outro.</p></div>`;
+      document.title = 'Kanshō | Anime não encontrado';
+      return;
+    }
+    const rated = a.score != null;
+    const pos = rated ? ranked.indexOf(a) + 1 : null;
+    const q = encodeURIComponent(a.title);
+    const meta = [a.year, a.studio, a.eps ? a.eps + ' episódios' : null].filter(Boolean).join(' · ');
+    /* quando a nota falta, explica o motivo em vez de deixar só um traço */
+    const why = key => {
+      if (key === 'imdb' && !CONFIG.omdbKey) return 'IMDb não configurado';
+      if (a.dynamic && (key === 'mal' || key === 'imdb') && lookupList().indexOf(a) >= (key === 'imdb' ? Math.min(CONFIG.imdbMax, CONFIG.lookupMax) : CONFIG.lookupMax)) return 'Não consultado (limite do catálogo ampliado)';
+      if (dataState.failed.includes(({ imdb: 'IMDb', mal: 'MyAnimeList', ani: 'AniList' })[key])) return 'Indisponível nesta conexão';
+      return 'Sem nota para este título';
+    };
+    const card = (site, v, votes, key) => `<div class="score-card"><div class="site">${site}</div>
+      <div class="val">${f1(v)}</div><div class="bar"><i style="width:${v == null ? 0 : v * 10}%"></i></div>
+      ${v == null ? `<div class="votes">${why(key)}</div>` : votes ? `<div class="votes">${fmtVotes(votes)} votos${key === 'imdb' && a.imdbSeries ? ' · série inteira' : ''}</div>` : ''}</div>`;
+    const showRaw = rated && a.raw != null && Math.abs(a.raw - a.score) >= 0.005;
+    /* link direto quando o ID da fonte é conhecido; caso contrário, busca por título */
+    const link = (url, label) => `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
+    const links = [
+      a.imdbId  ? link(`https://www.imdb.com/title/${a.imdbId}/`, 'Ver no IMDB')
+                : link(`https://www.imdb.com/find/?q=${q}`, 'Buscar no IMDB'),
+      a.malId   ? link(`https://myanimelist.net/anime/${a.malId}`, 'Ver no MyAnimeList')
+                : link(`https://myanimelist.net/search/all?q=${q}`, 'Buscar no MyAnimeList'),
+      a.anilistId ? link(`https://anilist.co/anime/${a.anilistId}`, 'Ver no AniList')
+                  : link(`https://anilist.co/search/anime?search=${q}`, 'Buscar no AniList')
+    ].join('\n            ');
+
+    $('detailBox').innerHTML = `
+      <article class="detail">
+        <div class="detail-side">
+          <div class="big-cover ${a.cls}" ${coverStyle(a)} role="img" aria-label="Capa de ${a.title}"></div>
+          ${heartBtn(a, 'side')}
+        </div>
+        <div>
+          <span class="pos-badge">${rated ? `#${pos} em Mais votados` : 'Ainda sem notas'}</span>
+          <h1>${a.title}</h1>
+          ${meta ? `<div class="meta">${meta}</div>` : ''}
+          <div class="chips">${a.genres.map(g => `<span class="chip">${g}</span>`).join('')}${(a.tags || []).filter(t => genreBySlug[t]).map(t => `<a class="chip" href="#/generos/${t}">${genreBySlug[t].name}</a>`).join('')}</div>
+          <p class="synopsis">${synOf(a)}</p>${a.synSrc === 'wiki' && a.wikiTitle ? `<p class="syn-note">Sinopse em português: resumo do verbete <a href="${esc(wikiUrl(a.wikiTitle))}" target="_blank" rel="noopener noreferrer">${esc(a.wikiTitle)}</a> na Wikipédia (CC BY-SA 4.0).</p>` : a.synPt ? '<p class="syn-note">Sinopse traduzida automaticamente do inglês (fonte original: AniList).</p>' : a.synEn ? '<p class="syn-note">Sinopse em inglês (fonte: AniList).</p>' : ''}
+          <div class="detail-scores">
+            ${card('IMDB', a.imdb, a.imdbVotes, 'imdb')}${card('MyAnimeList', a.mal, a.malVotes, 'mal')}${card('AniList', a.ani, a.aniVotes, 'ani')}
+            <div class="score-card avg"><div class="site">Média Kanshō</div>
+              <div class="val">${f2(a.score)}</div>
+              <div class="bar"><i style="width:${rated ? a.score * 10 : 0}%"></i></div>
+              ${getPrefs().avgMode === 'simple' ? '<div class="votes">Critério: média simples</div>' : showRaw ? `<div class="votes">Média simples: ${f2(a.raw)}</div>` : ''}</div>
+          </div>
+          <div class="ext-links">
+            ${links}
+          </div>
+        </div>
+      </article>`;
+    document.title = `${unesc(a.title)} | Kanshō`;
+  }
+
+  /* ===== Gêneros =====
+     Cada gênero tem uma página própria (#/generos/<slug>) que lista os animes marcados com aquele "tag" no catálogo.
+     Para usar imagens reais nos cards, preencha "cover" com a URL da imagem. */
+  const genres = [
+    { slug: 'shounen',       name: 'Shounen',       cls: 'g3',  cover: '', desc: 'Histórias de ação e superação, tradicionalmente voltadas ao público jovem' },
+    { slug: 'shoujo',        name: 'Shoujo',        cls: 'g7',  cover: '', desc: 'Foco em relações, emoções e amadurecimento, com público adolescente' },
+    { slug: 'seinen',        name: 'Seinen',        cls: 'g5',  cover: '', desc: 'Tramas mais sombrias e complexas, voltadas ao público adulto' },
+    { slug: 'josei',         name: 'Josei',         cls: 'g4',  cover: '', desc: 'Retratos realistas da vida e dos afetos de mulheres adultas' },
+    { slug: 'kodomo',        name: 'Kodomo',        cls: 'g6',  cover: '', desc: 'Animes pensados para o público infantil' },
+    { slug: 'isekai',        name: 'Isekai',        cls: 'g10', cover: '', desc: 'Personagens transportados ou reencarnados em outro mundo' },
+    { slug: 'slice-of-life', name: 'Slice of Life', cls: 'g9',  cover: '', desc: 'O cotidiano e as pequenas emoções, num ritmo mais calmo' },
+    { slug: 'mecha',         name: 'Mecha',         cls: 'g2',  cover: '', desc: 'Robôs gigantes, pilotos e guerras' },
+    { slug: 'esportes',      name: 'Esportes',      cls: 'g8',  cover: '', desc: 'Competição, treino e espírito de equipe' },
+    { slug: 'romance',       name: 'Romance',       cls: 'g7',  cover: '', desc: 'O amor é o centro da história' },
+    { slug: 'sobrenatural',  name: 'Sobrenatural',  cls: 'g1',  cover: '', desc: 'Maldições, demônios, espíritos e poderes inexplicáveis' },
+    { slug: 'historico',     name: 'Histórico',     cls: 'g5',  cover: '', desc: 'Ambientados em épocas passadas ou inspirados nelas' }
+  ];
+  const genreBySlug = Object.fromEntries(genres.map(g => [g.slug, g]));
+  const animesOf = slug => ranked.filter(a => (a.tags || []).includes(slug));
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+
+  /* a contagem sai da mesma lista (ranked) usada pela página do gênero; precisa ser refeita quando o catálogo ou as notas mudam */
+  function renderGenresGrid() {
+    $('genresGrid').innerHTML = genres.map(g => `
+    <a href="#/generos/${g.slug}" class="genre-card" title="${g.name}">
+      <div class="genre-img ${g.cls}" ${coverStyle(g)}><span>${g.name}<small>${plural(animesOf(g.slug).length, 'anime', 'animes')}</small></span></div>
+    </a>`).join('');
+  }
+  renderGenresGrid();
+
+  /* Cards em grade, usados por Favoritos, Busca e páginas de gênero */
+  function cardsHTML(list) {
+    return `<div class="fav-grid">${list.map(a => `<div class="fav-card">
+      <a href="#/anime/${a.id}" title="Ver página de ${a.title}">
+        <div class="cover-lg ${a.cls}" ${coverStyle(a)} aria-hidden="true"></div>
+        <h2>${a.title}</h2>
+      </a>
+      <div class="fav-foot">
+        <span class="m">Média: <b>${f2(a.score)}</b></span>
+        ${heartBtn(a, 'inline')}
+      </div>
+    </div>`).join('')}</div>`;
+  }
+
+  function renderGenre(slug) {
+    const g = genreBySlug[slug];
+    if (!g) {
+      $('genreBox').innerHTML = `<a href="#/generos" class="crumb">← Todos os gêneros</a>
+        <div class="empty-box"><p>Não encontramos este gênero.</p><p>Veja a <a href="#/generos">lista de gêneros</a>.</p></div>`;
+      document.title = 'Gênero não encontrado | Kanshō';
+      return;
+    }
+    const list = animesOf(slug);
+    $('genreBox').innerHTML = `<a href="#/generos" class="crumb">← Todos os gêneros</a>
+      <h1 class="genres-title">${g.name}</h1>
+      <p class="fav-sub">${g.desc} · ${plural(list.length, 'anime', 'animes')}, por ordem de média</p>` + cardsHTML(list);
+    document.title = `${g.name} | Kanshō`;
+  }
+
+  /* ===== Busca (título, título alternativo, gênero, estúdio ou ano; sem acentos e sem maiúsculas) ===== */
+  const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const searchText = a => norm([unesc(a.title), unesc(a.alt), unesc(a.studio), a.year, (a.genres || []).join(' '),
+    (a.tags || []).map(t => genreBySlug[t] ? genreBySlug[t].name : t).join(' ')].filter(Boolean).join(' '));
+  function searchAnimes(q) {
+    const toks = norm(q).split(/\s+/).filter(Boolean);
+    if (!toks.length) return [];
+    const inTitle = a => { const t = norm(unesc(a.title) + ' ' + unesc(a.alt || '')); return toks.every(k => t.includes(k)) ? 1 : 0; };
+    return ranked.filter(a => { const h = searchText(a); return toks.every(k => h.includes(k)); })
+                 .sort((x, y) => inTitle(y) - inTitle(x));
+  }
+
+  /* =====================================================================
+     CONTA DE USUÁRIO (cadastro e login)
+     ATENÇÃO: este é um sistema de DEMONSTRAÇÃO que roda só no navegador.
+     - As contas ficam no localStorage deste navegador/dispositivo: quem se
+       cadastra aqui NÃO consegue entrar em outro computador.
+     - A senha nunca é guardada em texto puro: é salva só como hash
+       (PBKDF2-SHA256 com "sal" aleatório por usuário).
+     - Mesmo assim, qualquer pessoa com acesso ao navegador pode ler/alterar
+       esses dados. Para um site real, mova o cadastro e o login para um
+       servidor (a verificação de senha e a sessão precisam ficar lá).
+     As funções register/login/logout abaixo são o ponto de troca: ao criar
+     o back-end, basta fazê-las chamar a sua API.
+     ===================================================================== */
+  const USERS_KEY = 'kansho-users';
+  const SESSION_KEY = 'kansho-session';
+  const PBKDF2_ITERATIONS = 600000;
+  const USERNAME_RE = /^[A-Za-z0-9._-]{3,20}$/;
+  const MIN_PASSWORD = 8;
+
+  const storageGet = key => { try { return localStorage.getItem(key); } catch (e) { return null; } };
+  const storageSet = (key, val) => { try { localStorage.setItem(key, val); return true; } catch (e) { return false; } };
+  const storageDel = key => { try { localStorage.removeItem(key); } catch (e) { /* ignora */ } };
+
+  function loadUsers() {
+    try {
+      const data = JSON.parse(storageGet(USERS_KEY) || '{}');
+      return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    } catch (e) { return {}; }
+  }
+  const saveUsers = users => storageSet(USERS_KEY, JSON.stringify(users));
+
+  /* --- Hash da senha (Web Crypto) --- */
+  const toB64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  const fromB64 = str => Uint8Array.from(atob(str), c => c.charCodeAt(0));
+
+  async function hashPassword(password, saltBytes, iterations) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations }, key, 256);
+    return toB64(bits);
+  }
+  function safeEqual(a, b) {
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return diff === 0;
+  }
+  const cryptoAvailable = () => !!(window.crypto && crypto.subtle);
+  const CRYPTO_ERROR = 'Seu navegador não permite criptografia nesta página. Abra o site por HTTPS (ou localhost) e tente de novo.';
+
+  /* --- Operações --- */
+  async function registerUser(username, password) {
+    const users = loadUsers();
+    const id = username.toLowerCase();
+    if (users[id]) return { ok: false, error: 'Este nome de usuário já está em uso.' };
+
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const hash = await hashPassword(password, salt, PBKDF2_ITERATIONS);
+    users[id] = { username, salt: toB64(salt), hash, iterations: PBKDF2_ITERATIONS, createdAt: new Date().toISOString() };
+    if (!saveUsers(users)) return { ok: false, error: 'Não foi possível salvar a conta. Verifique se o navegador permite armazenamento (modo anônimo costuma bloquear).' };
+    if (!storageSet(SESSION_KEY, id)) return { ok: false, error: 'Conta criada, mas não foi possível iniciar a sessão. Tente entrar manualmente.' };
+    return { ok: true };
+  }
+
+  async function loginUser(username, password) {
+    const GENERIC = 'Nome de usuário ou senha incorretos.';
+    const u = loadUsers()[username.toLowerCase()];
+    if (!u || typeof u.salt !== 'string' || typeof u.hash !== 'string') return { ok: false, error: GENERIC };
+    let hash;
+    try { hash = await hashPassword(password, fromB64(u.salt), u.iterations || PBKDF2_ITERATIONS); }
+    catch (e) { return { ok: false, error: GENERIC }; }
+    if (!safeEqual(hash, u.hash)) return { ok: false, error: GENERIC };
+    if (!storageSet(SESSION_KEY, username.toLowerCase())) return { ok: false, error: 'Não foi possível iniciar a sessão. Verifique se o navegador permite armazenamento.' };
+    return { ok: true };
+  }
+
+  function logoutUser() { storageDel(SESSION_KEY); }
+
+  /* Usuário logado (ou null) */
+  function currentUser() {
+    const id = storageGet(SESSION_KEY);
+    const u = id ? loadUsers()[id] : null;
+    return u && u.username ? u : null;
+  }
+
+  /* --- Configurações (uma por usuário) --- */
+  const settingsKey = () => { const u = currentUser(); return u ? 'kansho-settings:' + u.username.toLowerCase() : null; };
+  const DEFAULT_PREFS = { avgMode: 'weighted', carousel: true, reduceMotion: false };
+  const baseSettings = () => ({ name: currentUser().username, ...DEFAULT_PREFS });
+
+  function loadSettings() {
+    const key = settingsKey();
+    if (!key) return {};
+    try { return { ...baseSettings(), ...JSON.parse(storageGet(key) || '{}') }; }
+    catch (e) { return baseSettings(); }
+  }
+  function saveSettings(s) { const key = settingsKey(); if (key) storageSet(key, JSON.stringify(s)); }
+  /* Preferências em vigor: as da conta logada ou, sem login, as padrão */
+  const getPrefs = () => currentUser() ? { ...DEFAULT_PREFS, ...loadSettings() } : { ...DEFAULT_PREFS };
+  let appliedAvgMode = 'weighted';
+  function syncPrefs() {
+    const p = getPrefs();
+    document.documentElement.classList.toggle('reduce-motion', !!p.reduceMotion);
+    if (p.avgMode !== appliedAvgMode) { computeScores(); rerenderAll(); }
+    updatePauseButton(); restartTimer();
+  }
+
+  /* --- Cabeçalho: alterna entre "Entrar/Cadastrar" e "nome + Sair" --- */
+  function updateAuthUI() {
+    const u = currentUser();
+    $('navLogin').hidden = !!u;
+    $('navRegister').hidden = !!u;
+    $('navProfile').hidden = !u;
+    $('logoutBtn').hidden = !u;
+    $('navUserName').textContent = u ? loadSettings().name : '';
+  }
+
+  /* --- Formulários --- */
+  function showAuthError(id, msg) {
+    const box = $(id);
+    box.textContent = msg;
+    box.classList.toggle('show', !!msg);
+  }
+  function resetAuthForms() {
+    $('loginForm').reset();
+    $('registerForm').reset();
+    showAuthError('loginError', '');
+    showAuthError('registerError', '');
+  }
+  let afterAuth = null;   /* página para onde voltar depois de entrar/cadastrar */
+  const takeAfterAuth = () => { const h = afterAuth || '#/'; afterAuth = null; return h; };
+  function goTo(hash) {
+    if ((location.hash || '#/') === hash) route(); else location.hash = hash;
+  }
+  async function withBusy(form, fn) {
+    const btn = form.querySelector('button[type="submit"]');
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Aguarde…';
+    try { await fn(); } finally { btn.disabled = false; btn.textContent = label; }
+  }
+
+  $('loginForm').addEventListener('submit', e => {
+    e.preventDefault();
+    withBusy(e.currentTarget, async () => {
+      showAuthError('loginError', '');
+      const username = $('loginUser').value.trim();
+      const password = $('loginPass').value;
+      if (!username || !password) return showAuthError('loginError', 'Informe o nome de usuário e a senha.');
+      if (!cryptoAvailable()) return showAuthError('loginError', CRYPTO_ERROR);
+      const r = await loginUser(username, password);
+      if (!r.ok) { $('loginPass').value = ''; return showAuthError('loginError', r.error); }
+      goTo(takeAfterAuth());
+    });
+  });
+
+  $('registerForm').addEventListener('submit', e => {
+    e.preventDefault();
+    withBusy(e.currentTarget, async () => {
+      showAuthError('registerError', '');
+      const username = $('regUser').value.trim();
+      const password = $('regPass').value;
+      const confirm = $('regPass2').value;
+      const err = m => showAuthError('registerError', m);
+      if (!USERNAME_RE.test(username)) return err('O nome de usuário deve ter de 3 a 20 caracteres: letras, números, ponto, hífen ou sublinhado.');
+      if (password.length < MIN_PASSWORD) return err('A senha deve ter no mínimo ' + MIN_PASSWORD + ' caracteres.');
+      if (password.toLowerCase() === username.toLowerCase()) return err('A senha não pode ser igual ao nome de usuário.');
+      if (password !== confirm) return err('As senhas não coincidem.');
+      if (!cryptoAvailable()) return err(CRYPTO_ERROR);
+      const r = await registerUser(username, password);
+      if (!r.ok) return err(r.error);
+      goTo(afterAuth ? takeAfterAuth() : '#/para-voce');   /* conta nova: começa escolhendo os gêneros */
+    });
+  });
+
+  $('logoutBtn').addEventListener('click', () => { logoutUser(); goTo('#/'); });
+
+  /* Se a sessão mudar em outra aba (login/logout), atualiza esta também */
+  window.addEventListener('storage', e => { if (e.key === SESSION_KEY || e.key === USERS_KEY || (e.key && /^kansho-(favs|prefgenres):/.test(e.key))) route(); });
+
+  /* =====================================================================
+     FAVORITOS
+     Cada usuário tem a própria lista (ids dos animes, na ordem em que foram
+     favoritados), salva no localStorage. Como as contas, é uma versão de
+     demonstração: com back-end, troque loadFavs/saveFavs por chamadas à API.
+     ===================================================================== */
+  const favsKey = () => { const u = currentUser(); return u ? 'kansho-favs:' + u.username.toLowerCase() : null; };
+  function loadFavs() {
+    const key = favsKey();
+    if (!key) return [];
+    try {
+      const list = JSON.parse(storageGet(key) || '[]');
+      return Array.isArray(list) ? list.filter(id => byId[id]) : [];
+    } catch (e) { return []; }
+  }
+  function saveFavs(list) { const key = favsKey(); return !!key && storageSet(key, JSON.stringify(list)); }
+
+  /* Alterna o favorito. Retorna true (favoritado), false (removido) ou null (falha ao salvar) */
+  function toggleFav(id) {
+    const list = loadFavs();
+    const i = list.indexOf(id);
+    if (i >= 0) list.splice(i, 1); else list.push(id);
+    return saveFavs(list) ? i < 0 : null;
+  }
+
+  /* Sincroniza a aparência de todos os corações visíveis com a lista salva */
+  function refreshFavButtons() {
+    const favs = new Set(loadFavs());
+    document.querySelectorAll('.fav-btn[data-id]').forEach(b => {
+      const a = byId[b.dataset.id];
+      const on = favs.has(b.dataset.id);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.setAttribute('aria-label', (on ? 'Remover dos favoritos: ' : 'Favoritar: ') + a.title);
+      b.title = on ? 'Remover dos favoritos' : 'Favoritar';
+      const t = b.querySelector('.txt');
+      if (t) t.textContent = on ? 'Favoritado' : 'Favoritar';
+    });
+  }
+
+  function renderFavorites() {
+    const ids = loadFavs().reverse();   /* mais recentes primeiro */
+    const n = ids.length;
+    $('favsBox').innerHTML = `<h1 class="genres-title">Favoritos</h1>` + (n ? `
+      <p class="fav-sub">${n} ${n === 1 ? 'anime salvo' : 'animes salvos'}</p>` + cardsHTML(ids.map(id => byId[id]).filter(Boolean)) : `
+      <div class="empty-box">
+        <p>Você ainda não favoritou nenhum anime.</p>
+        <p>Explore o <a href="#/mais-votados">ranking de Mais votados</a> e clique no coração para salvar seus preferidos aqui.</p>
+      </div>`);
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.fav-btn[data-id]');
+    if (!btn) return;
+    e.preventDefault();
+    if (!currentUser()) {
+      afterAuth = location.hash || '#/';      /* volta para cá depois do login */
+      showToast('Entre na sua conta para salvar favoritos.');
+      goTo('#/login');
+      return;
+    }
+    const on = toggleFav(btn.dataset.id);
+    if (on === null) return showToast('Não foi possível salvar. Verifique se o navegador permite armazenamento.');
+    showToast(on ? 'Adicionado aos favoritos' : 'Removido dos favoritos');
+    if ($('view-favs').classList.contains('active')) renderFavorites();
+    if ($('view-home').classList.contains('active')) renderHomeReco();
+    refreshFavButtons();
+    if (btn.isConnected) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); }
+  });
+
+  /* =====================================================================
+     GÊNEROS FAVORITOS E RECOMENDAÇÕES (página "Para você")
+     Como funciona (tudo no navegador, sem servidor):
+     1. Cada anime vira um conjunto de "traços": seus gêneros (a.genres) e as
+        categorias da tela Gêneros (a.tags), unificados por PREF_OPTIONS.
+     2. O perfil do usuário é um peso por traço: gêneros escolhidos valem
+        PREF_WEIGHT_GENRE; cada favorito soma 1 em cada traço dele.
+     3. Cada anime não favoritado recebe uma "afinidade" (similaridade do cosseno
+        entre o perfil e os traços do anime), multiplicada por um pequeno bônus de
+        qualidade (a Média Kanshō). Sem nenhum traço em comum, não é sugerido.
+     Para ajustar o comportamento, mexa nas constantes PREF_WEIGHT_* e no "bônus".
+     ===================================================================== */
+  const PREF_WEIGHT_GENRE = 3;
+  const PREF_PAGE = 24;
+  const PREF_OPTIONS = [
+    { key: 'acao', label: 'Ação', group: 'genre' }, { key: 'aventura', label: 'Aventura', group: 'genre' },
+    { key: 'comedia', label: 'Comédia', group: 'genre' }, { key: 'drama', label: 'Drama', group: 'genre' },
+    { key: 'fantasia', label: 'Fantasia', group: 'genre' }, { key: 'ficcao-cientifica', label: 'Ficção científica', group: 'genre' },
+    { key: 'misterio', label: 'Mistério', group: 'genre' }, { key: 'suspense', label: 'Suspense', group: 'genre' },
+    { key: 'psicologico', label: 'Psicológico', group: 'genre' }, { key: 'terror', label: 'Terror', group: 'genre' },
+    { key: 'romance', label: 'Romance', group: 'genre' }, { key: 'esportes', label: 'Esportes', group: 'genre' },
+    { key: 'sobrenatural', label: 'Sobrenatural', group: 'genre' }, { key: 'musica', label: 'Música', group: 'genre' },
+    { key: 'slice-of-life', label: 'Cotidiano', group: 'genre' }, { key: 'mecha', label: 'Mecha', group: 'genre' },
+    { key: 'historico', label: 'Histórico', group: 'genre' }, { key: 'garota-magica', label: 'Garota mágica', group: 'genre' },
+    { key: 'shounen', label: 'Shounen', group: 'style' }, { key: 'shoujo', label: 'Shoujo', group: 'style' },
+    { key: 'seinen', label: 'Seinen', group: 'style' }, { key: 'josei', label: 'Josei', group: 'style' },
+    { key: 'kodomo', label: 'Kodomo', group: 'style' }, { key: 'isekai', label: 'Isekai', group: 'style' }
+  ];
+  const PREF_LABEL = Object.fromEntries(PREF_OPTIONS.map(o => [o.key, o.label]));
+  /* rótulo em português (a.genres) -> traço */
+  const GENRE_KEY = { 'Ação': 'acao', 'Aventura': 'aventura', 'Comédia': 'comedia', 'Drama': 'drama', 'Fantasia': 'fantasia', 'Fantasia sombria': 'fantasia',
+    'Ficção científica': 'ficcao-cientifica', 'Mistério': 'misterio', 'Suspense': 'suspense', 'Psicológico': 'psicologico', 'Terror': 'terror',
+    'Romance': 'romance', 'Esportes': 'esportes', 'Sobrenatural': 'sobrenatural', 'Música': 'musica', 'Cotidiano': 'slice-of-life',
+    'Mecha': 'mecha', 'Histórico': 'historico', 'Garota mágica': 'garota-magica' };
+
+  const featureCache = new Map();   /* id -> Set de traços (os gêneros de um título não mudam durante a sessão) */
+  function featureKeys(a) {
+    let f = featureCache.get(a.id);
+    if (!f) {
+      f = new Set();
+      (a.genres || []).forEach(g => { if (GENRE_KEY[g]) f.add(GENRE_KEY[g]); });
+      (a.tags || []).forEach(t => { if (PREF_LABEL[t]) f.add(t); });
+      featureCache.set(a.id, f);
+    }
+    return f;
+  }
+
+  /* --- Gêneros escolhidos (um conjunto por usuário) --- */
+  const prefKey = () => { const u = currentUser(); return u ? 'kansho-prefgenres:' + u.username.toLowerCase() : null; };
+  function loadPrefGenres() {
+    const key = prefKey();
+    if (!key) return [];
+    try {
+      const list = JSON.parse(storageGet(key) || '[]');
+      return Array.isArray(list) ? list.filter(k => PREF_LABEL[k]) : [];
+    } catch (e) { return []; }
+  }
+  function savePrefGenres(list) { const key = prefKey(); return !!key && storageSet(key, JSON.stringify(list)); }
+
+  /* --- Motor de recomendação --- */
+  function tasteProfile() {
+    const w = {};
+    const add = (k, v) => { w[k] = (w[k] || 0) + v; };
+    loadPrefGenres().forEach(k => add(k, PREF_WEIGHT_GENRE));
+    loadFavs().forEach(id => featureKeys(byId[id]).forEach(k => add(k, 1)));
+    return w;
+  }
+  function recommend() {
+    const w = tasteProfile();
+    const len = Math.sqrt(Object.values(w).reduce((t, v) => t + v * v, 0));
+    if (!len) return null;
+    const favs = loadFavs(), favSet = new Set(favs);
+    const favFeat = favs.map(id => ({ a: byId[id], f: featureKeys(byId[id]) }));
+    const recs = [];
+    ranked.forEach(a => {
+      if (favSet.has(a.id)) return;
+      const f = featureKeys(a);
+      let dot = 0;
+      f.forEach(k => { dot += w[k] || 0; });
+      if (!f.size || !dot) return;
+      const affinity = dot / (len * Math.sqrt(f.size));
+      const q = isNum(a.score) ? Math.min(1, Math.max(0, (a.score - 6) / 3.5)) : 0.5;   /* bônus: 6,0 -> 0, 9,5+ -> 1 */
+      const shared = [...f].filter(k => w[k]).sort((x, y) => w[y] - w[x]).slice(0, 3);
+      let similar = null, best = 0;                                                      /* favorito mais parecido (índice de Jaccard) */
+      favFeat.forEach(({ a: fa, f: ff }) => {
+        let inter = 0; f.forEach(k => { if (ff.has(k)) inter++; });
+        const j = inter / (f.size + ff.size - inter);
+        if (j > best) { best = j; similar = fa; }
+      });
+      recs.push({ a, rating: affinity * (0.6 + 0.4 * q), shared, similar: best >= 0.34 ? similar : null });
+    });
+    recs.sort((x, y) => y.rating - x.rating || (y.a.score || 0) - (x.a.score || 0));
+    return recs;
+  }
+  const recoWhy = r => [r.shared.length ? 'Combina com ' + r.shared.map(k => PREF_LABEL[k]).join(', ') : '',
+                        r.similar ? 'Parecido com ' + r.similar.title : ''].filter(Boolean).join(' · ');
+
+  /* --- Tela "Para você" --- */
+  let forYouLimit = PREF_PAGE;
+  function prefCountText() {
+    const n = loadPrefGenres().length;
+    return n ? plural(n, 'gênero escolhido', 'gêneros escolhidos') : 'Nenhum gênero escolhido';
+  }
+  function renderReco() {
+    const box = $('recoBox');
+    if (!box) return;
+    const recs = recommend();
+    const nPref = loadPrefGenres().length, nFav = loadFavs().length;
+    if (!recs) {
+      box.innerHTML = `<div class="empty-box"><p>Escolha alguns gêneros acima ou favorite animes para ver sugestões.</p>
+        <p>Quanto mais você marcar, mais certeiras ficam as recomendações.</p></div>`;
+    } else if (!recs.length) {
+      box.innerHTML = `<div class="empty-box"><p>Não encontramos novos títulos com esse perfil.</p>
+        <p>Experimente escolher mais gêneros acima.</p></div>`;
+    } else {
+      const shown = recs.slice(0, forYouLimit);
+      box.innerHTML = `<h2 class="reco-head">Recomendados para você</h2>
+        <p class="reco-sub">Com base em ${[nPref ? plural(nPref, 'gênero escolhido', 'gêneros escolhidos') : '', nFav ? plural(nFav, 'anime favoritado', 'animes favoritados') : ''].filter(Boolean).join(' e ')}. Mostrando ${shown.length} de ${recs.length}.</p>
+        <div class="fav-grid">${shown.map(r => `<div class="fav-card">
+          <a href="#/anime/${r.a.id}" title="Ver página de ${r.a.title}">
+            <div class="cover-lg ${r.a.cls}" ${coverStyle(r.a)} aria-hidden="true"></div>
+            <h2>${r.a.title}</h2>
+          </a>
+          <p class="reco-why">${recoWhy(r)}</p>
+          <div class="fav-foot"><span class="m">Média: <b>${f2(r.a.score)}</b></span>${heartBtn(r.a, 'inline')}</div>
+        </div>`).join('')}</div>
+        ${recs.length > shown.length ? '<div class="reco-more"><button type="button" class="sort-btn" id="recoMore">Mostrar mais</button></div>' : ''}`;
+    }
+    refreshFavButtons();
+  }
+  function renderForYou() {
+    const chosen = new Set(loadPrefGenres());
+    const chips = group => PREF_OPTIONS.filter(o => o.group === group).map(o =>
+      `<button type="button" class="sort-btn" data-pref="${o.key}" aria-pressed="${chosen.has(o.key)}">${o.label}</button>`).join('');
+    $('forYouBox').innerHTML = `<h1 class="genres-title">Para você</h1>
+      <section class="pref-panel" aria-labelledby="prefTitle">
+        <h2 id="prefTitle">Seus gêneros favoritos</h2>
+        <p class="hint">Marque os que você mais curte. As sugestões se ajustam na hora e também levam em conta os animes que você favoritou.</p>
+        <div class="pref-group"><h3 id="prefGenres">Gêneros</h3><div class="chip-set" role="group" aria-labelledby="prefGenres">${chips('genre')}</div></div>
+        <div class="pref-group"><h3 id="prefStyles">Estilos e públicos</h3><div class="chip-set" role="group" aria-labelledby="prefStyles">${chips('style')}</div></div>
+        <div class="pref-actions">
+          <span class="hint" id="prefCount" role="status">${prefCountText()}</span>
+          <button type="button" class="link-btn" id="prefClear" ${chosen.size ? '' : 'disabled'}>Limpar seleção</button>
+        </div>
+      </section>
+      <div id="recoBox"></div>`;
+    renderReco();
+  }
+  $('forYouBox').addEventListener('click', e => {
+    const chip = e.target.closest('[data-pref]');
+    if (chip) {
+      const list = loadPrefGenres(), k = chip.dataset.pref, i = list.indexOf(k);
+      if (i >= 0) list.splice(i, 1); else list.push(k);
+      if (!savePrefGenres(list)) return showToast('Não foi possível salvar. Verifique se o navegador permite armazenamento.');
+      chip.setAttribute('aria-pressed', i < 0 ? 'true' : 'false');
+    } else if (e.target.closest('#prefClear')) {
+      if (!savePrefGenres([])) return showToast('Não foi possível salvar. Verifique se o navegador permite armazenamento.');
+      $('forYouBox').querySelectorAll('[data-pref]').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    } else if (e.target.closest('#recoMore')) {
+      forYouLimit += PREF_PAGE; renderReco(); return;
+    } else return;
+    $('prefCount').textContent = prefCountText();
+    $('prefClear').disabled = !loadPrefGenres().length;
+    forYouLimit = PREF_PAGE;
+    renderReco();
+  });
+
+  /* --- Início: faixa "Recomendados para você" (só para quem está logado) --- */
+  function renderHomeReco() {
+    const sec = $('homeReco');
+    if (!currentUser()) { sec.hidden = true; return; }
+    sec.hidden = false;
+    const recs = recommend();
+    if (!recs || !recs.length) {
+      $('homeRecoBody').innerHTML = `<div class="empty-box home-reco-cta"><p>Escolha seus gêneros favoritos e receba sugestões feitas para você.</p>
+        <p><a href="#/para-voce">Escolher gêneros</a></p></div>`;
+      return;
+    }
+    $('homeRecoBody').innerHTML = `<div class="strip-wrap"><div class="strip" id="recoStrip">${recs.slice(0, 10).map(r => `<div class="top-item">
+        <a href="#/anime/${r.a.id}" class="top-card">
+          <div class="poster ${r.a.cls}" ${coverStyle(r.a)} aria-hidden="true"></div>
+          <div class="info"><h3>${r.a.title}</h3><p>${recoWhy(r)}</p></div>
+        </a>
+        ${heartBtn(r.a, 'top')}
+      </div>`).join('')}</div>
+      <button type="button" class="strip-arrow" data-target="recoStrip" aria-label="Ver mais recomendações">▶</button></div>
+      <p class="reco-sub" style="margin-top:10px"><a href="#/para-voce" style="text-decoration:underline;font-weight:700">Ver todas as recomendações e ajustar meus gêneros</a></p>`;
+    const arrow = $('homeRecoBody').querySelector('.strip-arrow');
+    arrow.addEventListener('click', () => { const st = $('recoStrip'); st.scrollBy({ left: st.clientWidth * 0.8, behavior: scrollBehavior() }); });
+    refreshFavButtons();
+  }
+
+  const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function renderProfile() {
+    const u = currentUser();
+    const s = { ...DEFAULT_PREFS, ...loadSettings() };
+    const created = new Date(u.createdAt)
+      .toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const toggle = (id, checked, labelId) => `<label class="switch"><input type="checkbox" id="${id}" aria-labelledby="${labelId}" ${checked ? 'checked' : ''}><span class="slider"></span></label>`;
+
+    $('profileBox').innerHTML = `
+      <section class="profile-head">
+        <div class="avatar-lg" aria-hidden="true"></div>
+        <div>
+          <h1 id="profileName">${escapeHtml(s.name)}</h1>
+          <div class="since">Conta criada em <b>${created}</b></div>
+        </div>
+      </section>
+
+      <section class="settings-panel">
+        <h2>Configurações gerais</h2>
+        <div class="setting">
+          <div><div class="label">Nome de exibição</div><div class="hint">Como você aparece no Kanshō.</div></div>
+          <input type="text" id="setName" maxlength="40" value="${escapeHtml(s.name)}" aria-label="Nome de exibição">
+        </div>
+        <div class="setting">
+          <div><div class="label">Critério da média</div><div class="hint">Média Kanshō: ajustada pelo número de votos de cada fonte. Média simples: apenas a média das notas.</div></div>
+          <select id="setAvg" aria-label="Critério da média">
+            <option value="weighted" ${s.avgMode !== 'simple' ? 'selected' : ''}>Média Kanshō (ponderada por votos)</option>
+            <option value="simple" ${s.avgMode === 'simple' ? 'selected' : ''}>Média simples das notas</option>
+          </select>
+        </div>
+        <div class="setting">
+          <div><div class="label" id="lblCarousel">Carrossel automático</div><div class="hint">Troca os destaques da página inicial sozinha a cada 6 segundos.</div></div>
+          ${toggle('setCarousel', s.carousel, 'lblCarousel')}
+        </div>
+        <div class="setting">
+          <div><div class="label" id="lblMotion">Reduzir animações</div><div class="hint">Desliga transições e animações. Também respeitamos a opção de movimento reduzido do seu sistema.</div></div>
+          ${toggle('setMotion', s.reduceMotion, 'lblMotion')}
+        </div>
+        <div class="settings-actions">
+          <button type="button" class="btn-save" id="saveSettings">Salvar alterações</button>
+          <span class="save-msg" id="saveMsg" role="status">Alterações salvas!</span>
+        </div>
+      </section>`;
+
+    $('saveSettings').addEventListener('click', () => {
+      const next = {
+        name: $('setName').value.trim() || u.username,
+        avgMode: $('setAvg').value === 'simple' ? 'simple' : 'weighted',
+        carousel: $('setCarousel').checked,
+        reduceMotion: $('setMotion').checked
+      };
+      saveSettings(next);
+      $('setName').value = next.name;
+      $('profileName').textContent = next.name;
+      updateAuthUI();
+      syncPrefs();
+      const msg = $('saveMsg');
+      msg.classList.add('show');
+      setTimeout(() => msg.classList.remove('show'), 2500);
+    });
+  }
+
+  /* =====================================================================
+     FONTES DE DADOS (notas e capas)
+     - AniList  : API GraphQL pública, sem chave. Nota (0–100, convertida para 0–10),
+                  nº de votos (soma da distribuição de notas), capa e banner.
+     - MyAnimeList: via API não oficial configurável em CONFIG.malApi (sem chave). Nota, nº de votos e capa.
+     - IMDb     : via OMDb API. EXIGE uma chave gratuita (https://www.omdbapi.com/apikey.aspx);
+                  sem chave a coluna IMDb fica vazia e a média usa só as outras fontes.
+     As requisições partem do navegador de quem visita o site. Para um site em produção,
+     o ideal é um pequeno servidor intermediário que consulte as APIs, guarde o resultado
+     e esconda a chave do OMDb (aqui ela ficaria visível no código).
+     Resultados ficam em cache no navegador (CONFIG.cacheTtlMs) para respeitar os limites
+     de cada API. Se tudo falhar e não houver cache, usa os valores "sample" do catálogo.
+     ===================================================================== */
+  const CONFIG = {
+    omdbKey: '546d0547',                        /* cole aqui a chave do OMDb para ativar o IMDb */
+    cacheTtlMs: 24 * 60 * 60 * 1000,    /* reaproveita as notas salvas por 24 horas (elas mudam devagar e o OMDb gratuito dá 1.000 consultas/dia) */
+    malApi: 'https://jikan.lucashdo.com/v1',   /* API não oficial do MyAnimeList (a Jikan pública, api.jikan.moe/v4, foi encerrada em 01/10/2026) */
+    jikanDelayMs: 1050,                 /* a API do MyAnimeList aceita ~60 requisições por minuto */
+    catalogSize: 200,                   /* quantos animes populares do AniList entram no catálogo (além da seleção fixa) */
+    pageSize: 50,                       /* o AniList entrega no máximo 50 por página: o catálogo é buscado página a página */
+    lookupMax: 250,                     /* MyAnimeList e IMDb só são consultados para este nº de títulos (seleção fixa + os mais populares) */
+    imdbMax: 60,                        /* o IMDb (OMDb, 1.000 consultas/dia na chave gratuita) só é consultado para os N primeiros da lista (seleção fixa + mais populares) */
+    catalogKeep: 300,                   /* teto de títulos guardados no navegador (favoritos não somem quando saem do topo) */
+    trendingSize: 10,                   /* tamanho do Top 10 em alta */
+    catalogTtlMs: 15 * 60 * 1000,       /* lista de populares/em alta e trailers: atualizada a cada 15 min */
+    newsTtlMs: 30 * 60 * 1000,          /* notícias: a cada 30 min */
+    refreshMs: 15 * 60 * 1000,          /* enquanto a página está aberta, confere novidades neste intervalo */
+    timeoutMs: 12000
+  };
+  const CACHE_KEY = 'kansho-scores-v2';   /* v2: catálogo ampliado (as notas salvas na v1 não cobrem os novos títulos) */
+  const isNum = v => typeof v === 'number' && Number.isFinite(v);
+  const safeUrl = u => (typeof u === 'string' && /^https:\/\/[^\s'"()<>\\]+$/.test(u)) ? u : '';
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const dataState = { mode: 'loading', fetchedAt: 0, failed: [] };
+  let loadingScores = false;
+
+  async function fetchJSON(url, options) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), CONFIG.timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: ctrl.signal });
+      if (!res.ok) { const err = new Error('HTTP ' + res.status); err.status = res.status; throw err; }
+      return await res.json();
+    } finally { clearTimeout(timer); }
+  }
+
+  /* --- AniList: uma única consulta (em lotes de 50) traz todos os animes pelo ID do MyAnimeList --- */
+  const ANILIST_QUERY = `query ($ids: [Int], $perPage: Int) {
+    Page(perPage: $perPage) {
+      media(idMal_in: $ids, type: ANIME) {
+        id idMal averageScore bannerImage popularity
+        coverImage { extraLarge large }
+        stats { scoreDistribution { score amount } }
+      }
+    }
+  }`;
+  async function fetchAniList(live) {
+    const list = animes.filter(a => a.malId && !a.dynamic);   /* os títulos do catálogo dinâmico já vêm com a nota do AniList */
+    for (let i = 0; i < list.length; i += 50) {
+      const chunk = list.slice(i, i + 50);
+      const json = await fetchJSON('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ query: ANILIST_QUERY, variables: { ids: chunk.map(a => a.malId), perPage: 50 } })
+      });
+      const media = json && json.data && json.data.Page && json.data.Page.media;
+      if (!Array.isArray(media)) throw new Error('resposta inesperada');
+      media.forEach(m => {
+        const a = chunk.find(x => x.malId === m.idMal);
+        if (!a) return;
+        const votes = ((m.stats && m.stats.scoreDistribution) || []).reduce((sum, d) => sum + (isNum(d.amount) ? d.amount : 0), 0);
+        const d = live[a.id] = live[a.id] || {};
+        d.anilistId = m.id;
+        d.popularity = isNum(m.popularity) ? m.popularity : (isNum(d.popularity) ? d.popularity : null);
+        d.ani = isNum(m.averageScore) && m.averageScore > 0 ? { score: m.averageScore / 10, votes } : null;
+        d.cover = safeUrl(m.coverImage && (m.coverImage.extraLarge || m.coverImage.large)) || d.cover || '';
+        d.banner = safeUrl(m.bannerImage) || d.banner || '';
+      });
+    }
+  }
+
+  /* --- MyAnimeList via Jikan: uma requisição por anime, em fila --- */
+  async function fetchJikanOne(a, live) {
+    const url = `${CONFIG.malApi}/anime/${a.malId}`;
+    let json;
+    for (let attempt = 0; ; attempt++) {      /* a Jikan oscila: limite (429), erro do servidor (5xx) ou tempo esgotado → até 2 novas tentativas */
+      try { json = await fetchJSON(url); break; }
+      catch (e) {
+        const retry = e.status === 429 || e.status >= 500 || e.name === 'AbortError' || e instanceof TypeError;
+        if (!retry || attempt >= 2) throw e;
+        await sleep(1500 * (attempt + 1));
+      }
+    }
+    const m = json && (json.data || json);   /* aceita {data:{...}} (formato Jikan) ou o objeto direto */
+    if (!m || typeof m !== 'object') throw new Error('resposta inesperada');
+    /* trava de segurança: se o ano não bate, o malId do catálogo provavelmente está errado */
+    if (a.year && isNum(m.year) && Math.abs(m.year - a.year) > 1) {
+      console.warn(`[Kanshō] malId ${a.malId} (${m.title}) tem ano ${m.year}, mas o catálogo diz ${a.year} em "${a.id}". Ignorado.`);
+      (live[a.id] = live[a.id] || {}).mal = null;
+      return;
+    }
+    const d = live[a.id] = live[a.id] || {};
+    d.mal = isNum(m.score) && m.score > 0 ? { score: m.score, votes: isNum(m.scored_by) ? m.scored_by : (isNum(m.scoredBy) ? m.scoredBy : null) } : null;
+    if (!d.cover) d.cover = safeUrl(m.images && m.images.jpg && (m.images.jpg.large_image_url || m.images.jpg.image_url));
+  }
+
+  /* --- IMDb via OMDb (só com chave) --- */
+  /* O IMDb costuma listar a série inteira, enquanto o MyAnimeList/AniList separam por temporada ("Season 2", "II", "Part 2",
+     "Final Season", subtítulos de arco). Para essas temporadas, a busca tenta o título e, se não achar, versões sem a marca de
+     temporada; a nota exibida passa a ser a da série (marcada como tal). Até 3 consultas por título, no máximo. */
+  const SEASON_MARKS = [
+    /\s*[:\-–]?\s*\b(the\s+)?final\s+season\b.*$/i,
+    /\s*[:\-–]?\s*\b(season|temporada|cour|part|parte)\s*\d+\b.*$/i,
+    /\s*[:\-–]?\s*\b\d+(st|nd|rd|th)\s+(season|cour|part)\b.*$/i,
+    /\s+(II|III|IV|V|VI|VII|VIII|IX|X)\s*$/
+  ];
+  const stripSeason = t => SEASON_MARKS.reduce((x, re) => x.replace(re, ''), String(t)).trim();
+  function omdbCandidates(a) {
+    const names = [unesc(a.imdbTitle || a.title), ...unesc(a.alt || '').split(' · ')].map(x => x.trim()).filter(Boolean).slice(0, 4);
+    const out = [];
+    const add = t => { t = String(t || '').trim(); if (t.length >= 3 && !out.some(o => norm(o) === norm(t))) out.push(t); };
+    add(names[0]);
+    (a.roots || []).forEach(r => add(stripSeason(r)));   /* série raiz, pela relação "prequel" do AniList */
+    const base = stripSeason(names[0] || '');
+    add(base);
+    add(base.split(/\s*[:：]\s*|\s+[-–]\s+/)[0]);      /* "Dr. Stone: New World" → "Dr. Stone" */
+    names.slice(1).forEach(n => add(stripSeason(n)));
+    return out.slice(0, 3);
+  }
+  const omdbMemo = new Map();   /* temporadas da mesma série compartilham a resposta (economiza a cota diária) */
+  async function omdbLookup(query) {
+    if (omdbMemo.has(query)) return omdbMemo.get(query);
+    const json = await fetchJSON(`https://www.omdbapi.com/?${query}&apikey=${encodeURIComponent(CONFIG.omdbKey)}`);
+    if (!json) throw new Error('resposta inesperada');
+    let out = json;
+    if (json.Response === 'False') {
+      if (!/not found|incorrect imdb id/i.test(json.Error || '')) {   /* chave inválida, limite diário... afetam a fonte inteira */
+        const err = new Error(json.Error || 'erro do OMDb'); err.fatal = true; throw err;
+      }
+      out = null;                                                      /* só este título não foi encontrado */
+    }
+    omdbMemo.set(query, out);
+    return out;
+  }
+  async function fetchOmdbOne(a, live) {
+    const d = live[a.id] = live[a.id] || {};
+    const enc = encodeURIComponent;
+    const tries = a.imdbId
+      ? [{ q: 'i=' + enc(a.imdbId), first: true }]
+      : omdbCandidates(a).map((t, i) => ({ q: 't=' + enc(t) + (i === 0 && a.year ? '&y=' + a.year : '') + '&type=series', first: i === 0 }));
+    const want = [unesc(a.title), ...unesc(a.alt || '').split(' · '), ...(a.roots || []), ...omdbCandidates(a)].map(norm).filter(Boolean);
+    let found = null, viaSeries = false;
+    for (const tr of tries) {
+      const json = await omdbLookup(tr.q);
+      if (!json) continue;
+      const start = parseInt(String(json.Year || ''), 10);
+      if (tr.first) {
+        if (a.year && !String(json.Year || '').startsWith(String(a.year))) { console.warn(`[Kanshō] IMDb "${json.Title}" (${json.Year}) não confere com "${a.id}" (${a.year}).`); continue; }
+      } else if (a.year && !(isNum(start) && start <= a.year + 1)) continue;   /* a série não pode ter começado depois da temporada */
+      if (a.dynamic) {   /* títulos acrescentados automaticamente: busca por nome é menos segura, então o título precisa conferir */
+        const got = norm(json.Title);
+        if (!got || !want.some(w => w === got || w.includes(got) || got.includes(w))) { console.warn(`[Kanshō] IMDb "${json.Title}" não confere com "${a.id}".`); continue; }
+      }
+      found = json; viaSeries = !tr.first; break;
+    }
+    if (!found) { console.warn(`[Kanshō] IMDb não encontrou "${a.id}". Confira imdbId/imdbTitle no catálogo.`); d.imdb = null; d.imdbSeries = false; return; }
+    const score = parseFloat(found.imdbRating);
+    const votes = parseInt(String(found.imdbVotes || '').replace(/\D/g, ''), 10);
+    d.imdb = isNum(score) && score > 0 ? { score, votes: isNum(votes) && votes > 0 ? votes : null } : null;
+    d.imdbSeries = !!(d.imdb && viaSeries);
+  }
+
+  /* --- Catálogo dinâmico: animes mais populares e em alta no AniList (uma consulta, sem chave).
+     Títulos novos entram com id "al<ID do AniList>"; os que já existem na seleção fixa (mesmo malId) só ganham
+     popularidade, posição em alta e trailer. As sinopses dos novos vêm em inglês. --- */
+  const CATALOG_KEY = 'kansho-catalog-v1';
+  const CATALOG_FIELDS = `id idMal title { romaji english } synonyms seasonYear startDate { year } episodes genres
+    tags { name rank } description(asHtml: false) studios(isMain: true) { nodes { name } }
+    averageScore popularity coverImage { extraLarge large } bannerImage trailer { id site }
+    stats { scoreDistribution { score amount } }`;
+  const CATALOG_FILTER = 'type: ANIME, isAdult: false, format_in: [TV, TV_SHORT, ONA], genre_not_in: ["Hentai"]';
+  const CATALOG_QUERY = `query ($n: Int, $t: Int, $p: Int) {
+    popular: Page(page: $p, perPage: $n) { media(${CATALOG_FILTER}, sort: POPULARITY_DESC) { ${CATALOG_FIELDS} } }
+    trending: Page(perPage: $t) { media(${CATALOG_FILTER}, sort: TRENDING_DESC) { ${CATALOG_FIELDS} } }
+  }`;
+  const CATALOG_PAGE_QUERY = `query ($n: Int, $p: Int) {
+    Page(page: $p, perPage: $n) { media(${CATALOG_FILTER}, sort: POPULARITY_DESC) { ${CATALOG_FIELDS} } }
+  }`;
+  const GENRE_PT = { Action: 'Ação', Adventure: 'Aventura', Comedy: 'Comédia', Drama: 'Drama', Ecchi: 'Ecchi', Fantasy: 'Fantasia', Horror: 'Terror',
+    'Mahou Shoujo': 'Garota mágica', Mecha: 'Mecha', Music: 'Música', Mystery: 'Mistério', Psychological: 'Psicológico', Romance: 'Romance',
+    'Sci-Fi': 'Ficção científica', 'Slice of Life': 'Cotidiano', Sports: 'Esportes', Supernatural: 'Sobrenatural', Thriller: 'Suspense' };
+  const GENRE_TAG = { Sports: 'esportes', Mecha: 'mecha', Romance: 'romance', Supernatural: 'sobrenatural', 'Slice of Life': 'slice-of-life' };
+  const TAG_TAG = { Isekai: 'isekai', Shounen: 'shounen', Shoujo: 'shoujo', Seinen: 'seinen', Josei: 'josei', Kids: 'kodomo', Historical: 'historico' };
+  const mediaTitle = m => (m.title && (m.title.english || m.title.romaji)) || 'Sem título';
+
+  function cleanText(t, max) {
+    let x = String(t || '').replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+    x = x.replace(/\(Source:[^)]*\)\s*$/i, '').replace(/\[Written by[^\]]*\]\s*$/i, '').trim();
+    if (x.length > max) x = x.slice(0, max).replace(/\s+\S*$/, '') + '…';
+    return x;
+  }
+  /* Os textos vindos da API são guardados já escapados (os modelos da página inserem o título e a sinopse como HTML) */
+  function entryFromMedia(m, id) {
+    const t = m.title || {}, title = mediaTitle(m);
+    const alt = [t.romaji, t.english, ...(m.synonyms || [])].filter(x => x && x !== title).slice(0, 4).join(' · ');
+    const names = new Set((m.tags || []).filter(x => x && x.rank >= 50).map(x => x.name));
+    const tags = [];
+    (m.genres || []).forEach(g => { if (GENRE_TAG[g] && !tags.includes(GENRE_TAG[g])) tags.push(GENRE_TAG[g]); });
+    Object.keys(TAG_TAG).forEach(n => { if (names.has(n) && !tags.includes(TAG_TAG[n])) tags.push(TAG_TAG[n]); });
+    const studio = m.studios && m.studios.nodes && m.studios.nodes[0] && m.studios.nodes[0].name;
+    return {
+      id, title: esc(title), alt: esc(alt), year: m.seasonYear || (m.startDate && m.startDate.year) || null,
+      studio: esc(studio || ''), eps: isNum(m.episodes) ? m.episodes : null,
+      genres: (m.genres || []).map(g => GENRE_PT[g]).filter(Boolean), tags,
+      malId: isNum(m.idMal) ? m.idMal : null,
+      synopsis: esc(cleanText(m.description, 330)) || 'Sinopse não disponível.',
+      cls: 'g' + (m.id % 10 + 1)
+    };
+  }
+  function buildCatalog(popular, trending, prev) {
+    const all = new Map();
+    [...trending, ...popular].forEach(m => { if (m && isNum(m.id) && !all.has(m.id)) all.set(m.id, m); });
+    const idFor = m => { const cur = animes.find(a => !a.dynamic && a.malId && a.malId === m.idMal); return cur ? cur.id : 'al' + m.id; };
+    const entries = [], items = {}, popularity = {}, idOf = new Map();
+    all.forEach(m => {
+      const id = idFor(m); idOf.set(m.id, id);
+      if (/^al\d+$/.test(id)) entries.push(entryFromMedia(m, id));
+      const votes = ((m.stats && m.stats.scoreDistribution) || []).reduce((sum, d) => sum + (isNum(d.amount) ? d.amount : 0), 0);
+      items[id] = {
+        ani: isNum(m.averageScore) && m.averageScore > 0 ? { score: m.averageScore / 10, votes } : null,
+        anilistId: m.id, cover: safeUrl(m.coverImage && (m.coverImage.extraLarge || m.coverImage.large)), banner: safeUrl(m.bannerImage),
+        popularity: isNum(m.popularity) ? m.popularity : null
+      };
+      if (isNum(m.popularity)) popularity[id] = m.popularity;
+    });
+    /* títulos que já saíram do topo continuam no catálogo (favoritos não podem sumir), até um limite */
+    if (prev && Array.isArray(prev.entries)) {
+      prev.entries.forEach(e => {
+        if (e && e.id && !items[e.id] && entries.length < CONFIG.catalogKeep && prev.items && prev.items[e.id]) {
+          entries.push(e); items[e.id] = prev.items[e.id];
+          if (prev.popularity && isNum(prev.popularity[e.id])) popularity[e.id] = prev.popularity[e.id];
+        }
+      });
+    }
+    const trendingIds = trending.filter(m => m && idOf.has(m.id)).map(m => idOf.get(m.id));
+    const seenYt = new Set();
+    const trailers = trending.filter(m => m && m.trailer && m.trailer.site === 'youtube' && /^[\w-]{11}$/.test(m.trailer.id || '') && !seenYt.has(m.trailer.id) && seenYt.add(m.trailer.id))
+      .slice(0, 8).map(m => ({ yt: m.trailer.id, title: mediaTitle(m) }));
+    return { entries, items, popularity, trending: trendingIds, trailers };
+  }
+  function mergeCatalog(c) {
+    if (!c || !Array.isArray(c.entries) || !c.items || typeof c.items !== 'object') return false;
+    c.entries.forEach(e => {
+      if (!e || typeof e.id !== 'string' || !/^al\d+$/.test(e.id) || typeof e.title !== 'string' || byId[e.id]) return;
+      const a = {
+        id: e.id, title: e.title, alt: String(e.alt || ''), year: isNum(e.year) ? e.year : null, studio: String(e.studio || ''),
+        eps: isNum(e.eps) ? e.eps : null, genres: Array.isArray(e.genres) ? e.genres.map(String) : [], tags: Array.isArray(e.tags) ? e.tags.map(String) : [],
+        malId: isNum(e.malId) ? e.malId : null, synopsis: String(e.synopsis || ''), cls: /^g([1-9]|10)$/.test(e.cls) ? e.cls : 'g5',
+        cover: '', coverFixed: '', synEn: true, dynamic: true, src: {},
+        roots: Array.isArray(e.roots) ? e.roots.filter(x => typeof x === 'string').slice(0, 2) : null,
+        synPt: ptText(e.id) ? esc(ptText(e.id)) : undefined, synSrc: ptSrc(e.id), wikiTitle: ptWiki(e.id)
+      };
+      animes.push(a); byId[a.id] = a;
+    });
+    catalogMeta = {
+      trending: Array.isArray(c.trending) ? c.trending.filter(x => typeof x === 'string') : [],
+      trailers: Array.isArray(c.trailers) ? c.trailers : [], popularity: c.popularity || {}, items: c.items, fetchedAt: isNum(c.fetchedAt) ? c.fetchedAt : 0
+    };
+    return true;
+  }
+  function readCatalogCache() {
+    try { const c = JSON.parse(storageGet(CATALOG_KEY) || 'null'); return c && typeof c === 'object' ? c : null; } catch (e) { return null; }
+  }
+  /* devolve true se trouxe dados novos */
+  async function refreshCatalog(force) {
+    if (!force && catalogMeta.fetchedAt && Date.now() - catalogMeta.fetchedAt < CONFIG.catalogTtlMs) return false;
+    try {
+      const gql = (query, variables) => fetchJSON('https://graphql.anilist.co', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ query, variables })
+      });
+      const json = await gql(CATALOG_QUERY, { n: CONFIG.pageSize, t: CONFIG.trendingSize, p: 1 });
+      const d = json && json.data;
+      if (!d || !d.popular || !d.trending || !Array.isArray(d.popular.media) || !Array.isArray(d.trending.media)) throw new Error('resposta inesperada');
+      if (!d.popular.media.length && !d.trending.media.length) return false;
+      let popular = d.popular.media;
+      /* os trailers só dependem desta primeira resposta: aparecem já, sem esperar as outras páginas nem as séries raiz */
+      try { catalogMeta = Object.assign({}, catalogMeta, { trailers: buildCatalog(popular, d.trending.media, null).trailers }); renderTrailers(); } catch (e) { /* segue o fluxo normal */ }
+      /* páginas seguintes (50 por vez) enquanto a anterior vier cheia; uma falha aqui só encurta o catálogo */
+      for (let pg = 2; popular.length === (pg - 1) * CONFIG.pageSize && popular.length < CONFIG.catalogSize; pg++) {
+        try {
+          await sleep(250);
+          const j2 = await gql(CATALOG_PAGE_QUERY, { n: CONFIG.pageSize, p: pg });
+          const more = j2 && j2.data && j2.data.Page && j2.data.Page.media;
+          if (!Array.isArray(more) || !more.length) break;
+          popular = popular.concat(more);
+        } catch (e) { console.warn('[Kanshō] catálogo, página ' + pg + ':', e.message); break; }
+      }
+      const next = buildCatalog(popular.slice(0, CONFIG.catalogSize), d.trending.media, readCatalogCache());
+      try { await resolveRoots(next.entries, gql); } catch (e) { console.warn('[Kanshō] séries (prequel):', e.message); }
+      next.fetchedAt = Date.now();
+      storageSet(CATALOG_KEY, JSON.stringify(next));
+      mergeCatalog(next);
+      return true;
+    } catch (e) { console.warn('[Kanshō] catálogo:', e.message); return false; }
+  }
+
+  /* --- Série raiz pela relação "prequel" do AniList: cada temporada herda o título da primeira, usado na busca do IMDb.
+     A consulta alcança 3 níveis de "prequel"; quem ainda tem mais para trás é consultado de novo (até 3 rodadas). --- */
+  const REL_NODE = 'id format title { romaji english }';
+  const REL_QUERY = `query ($ids: [Int], $n: Int) { Page(perPage: $n) { media(id_in: $ids) { ${REL_NODE}
+    relations { edges { relationType node { ${REL_NODE}
+      relations { edges { relationType node { ${REL_NODE}
+        relations { edges { relationType node { ${REL_NODE} } } } } } } } } } } } }`;
+  const TV_LIKE = ['TV', 'TV_SHORT', 'ONA'];
+  function walkPrequels(m) {
+    const chain = [m]; let cur = m;
+    for (;;) {
+      if (!cur.relations) return { chain, more: true };                  /* limite da consulta: continua a partir deste nó */
+      const e = (cur.relations.edges || []).find(x => x && x.relationType === 'PREQUEL' && x.node);
+      if (!e) return { chain, more: false };
+      cur = e.node; chain.push(cur);
+      if (chain.length > 10) return { chain, more: false };
+    }
+  }
+  async function resolveRoots(entries, gql) {
+    const st = new Map();
+    entries.filter(e => e && !Array.isArray(e.roots) && /^al\d+$/.test(e.id)).forEach(e => st.set(e.id, { at: Number(e.id.slice(2)), chain: [], round: 0 }));
+    let pending = [...st.keys()];
+    for (let round = 0; round < 3 && pending.length; round++) {
+      const ids = [...new Set(pending.map(id => st.get(id).at))], got = new Map();
+      for (let i = 0; i < ids.length; i += 50) {
+        const j = await gql(REL_QUERY, { ids: ids.slice(i, i + 50), n: 50 });
+        const media = j && j.data && j.data.Page && j.data.Page.media;
+        if (Array.isArray(media)) media.forEach(m => m && got.set(m.id, m));
+        if (i + 50 < ids.length) await sleep(250);
+      }
+      const next = [];
+      pending.forEach(id => {
+        const t = st.get(id), m = got.get(t.at);
+        if (!m) { st.delete(id); return; }                               /* sem resposta: tenta de novo na próxima atualização */
+        const w = walkPrequels(m);
+        t.chain.push(...(round === 0 ? w.chain : w.chain.slice(1)));
+        const last = w.chain[w.chain.length - 1];
+        if (w.more && last && isNum(last.id) && last.id !== t.at) { t.at = last.id; next.push(id); }
+      });
+      pending = next;
+    }
+    entries.forEach(e => {
+      const t = st.get(e.id);
+      if (!t) return;
+      const older = t.chain.slice(1);
+      const root = [...older].reverse().find(n => n && TV_LIKE.includes(n.format)) || older[older.length - 1];
+      const titles = root && root.title ? [root.title.english, root.title.romaji].filter(Boolean) : [];
+      e.roots = [...new Set(titles)].slice(0, 2);
+    });
+  }
+
+  /* --- Sinopses em português: as do catálogo automático vêm em inglês. Ordem de tentativa para as que aparecem nos destaques
+     (e as dos títulos abertos): 1) resumo do verbete da Wikipédia em português (texto humano, sem chave, com crédito à fonte);
+     2) tradução automática pelo MyMemory (gratuito, 5.000 caracteres/dia por IP). O resultado fica guardado no navegador. --- */
+  const PT_KEY = 'kansho-pt-v1';
+  let ptCache = (() => { try { const o = JSON.parse(storageGet(PT_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } })();
+  /* cada item é um texto (tradução automática, formato antigo) ou { t: texto, s: 'wiki'|'mt', w: título do verbete } */
+  const ptText = id => { const v = ptCache[id]; return typeof v === 'string' ? v : (v && typeof v.t === 'string' ? v.t : ''); };
+  const ptSrc = id => { const v = ptCache[id]; return v && typeof v === 'object' && v.s === 'wiki' ? 'wiki' : (ptText(id) ? 'mt' : undefined); };
+  const ptWiki = id => { const v = ptCache[id]; return v && typeof v === 'object' && v.s === 'wiki' && typeof v.w === 'string' ? v.w : undefined; };
+  const ptBusy = new Set(); let ptFails = 0, wikiFails = 0, translatingHero = false;
+  function ptStore(a, text, src, wikiTitle) {
+    ptCache[a.id] = src === 'wiki' ? { t: text, s: 'wiki', w: wikiTitle } : { t: text, s: 'mt' };
+    const keys = Object.keys(ptCache); if (keys.length > 300) delete ptCache[keys[0]];
+    storageSet(PT_KEY, JSON.stringify(ptCache));
+    a.synPt = esc(text); a.synSrc = src; a.wikiTitle = src === 'wiki' ? wikiTitle : undefined;
+  }
+  const wikiUrl = t => 'https://pt.wikipedia.org/wiki/' + encodeURIComponent(String(t).replace(/ /g, '_'));
+
+  /* Wikipédia: uma consulta de busca já traz o início de cada verbete. Só vale se o título conferir e o texto falar de anime/mangá;
+     páginas de desambiguação e verbetes de outro assunto são descartados. */
+  const WIKI_TOPIC = /anim[eê]|mang[aá]|light novel|desenho animado|s[eé]rie de anima/i;
+  function wikiClean(x) {
+    x = String(x || '').replace(/\([^()]*[　-鿿＀-￯][^()]*\)/g, '').replace(/\s+/g, ' ').replace(/\s+([,.;:])/g, '$1').trim();
+    if (x.length > 700) { const cut = x.slice(0, 700), i = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? ')); x = i > 250 ? cut.slice(0, i + 1) : cut.replace(/\s+\S*$/, '') + '…'; }
+    return x;
+  }
+  async function wikiSynopsis(a) {
+    const names = [unesc(a.title), ...unesc(a.alt || '').split(' · '), ...(a.roots || []).map(unesc)].map(x => x.trim()).filter(x => x.length >= 3);
+    const wanted = [...new Set(names.map(x => norm(x)))].filter(Boolean).slice(0, 5);
+    if (!wanted.length) return null;
+    const queries = [...new Set([names[0], stripSeason(names[0])].filter(Boolean))].slice(0, 2);
+    for (const q of queries) {
+      const url = 'https://pt.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&generator=search&gsrnamespace=0&gsrlimit=5&gsrsearch='
+        + encodeURIComponent(q + ' anime') + '&prop=extracts%7Cpageprops&exintro=1&explaintext=1&exchars=1200&exlimit=5&ppprop=disambiguation';
+      const json = await fetchJSON(url);
+      const pages = Object.values((json && json.query && json.query.pages) || {}).sort((x, y) => (x.index || 99) - (y.index || 99));
+      for (const pg of pages) {
+        if (!pg || typeof pg.title !== 'string' || typeof pg.extract !== 'string' || (pg.pageprops && 'disambiguation' in pg.pageprops)) continue;
+        const t = norm(pg.title.replace(/\s*\([^)]*\)\s*$/, ''));
+        if (t.length < 4 || !wanted.some(w => w === t || (w.length >= 4 && (w.includes(t) || t.includes(w))))) continue;
+        if (!WIKI_TOPIC.test(pg.extract.slice(0, 500)) && !/\((anime|série|manga|mangá|animê)/i.test(pg.title)) continue;
+        const text = wikiClean(pg.extract);
+        if (text.length >= 80) return { text, title: pg.title };
+      }
+    }
+    return null;
+  }
+  async function translateSynopsis(a) {
+    if (!a || !a.dynamic || a.synPt || ptBusy.has(a.id)) return false;
+    ptBusy.add(a.id);
+    try {
+      if (wikiFails < 3) {
+        try { const w = await wikiSynopsis(a); wikiFails = 0; if (w) { ptStore(a, w.text, 'wiki', w.title); return true; } }
+        catch (e) { wikiFails++; console.warn('[Kanshō] Wikipédia:', a.id, e.message); }
+      }
+      if (ptFails >= 3) return false;
+      let src = unesc(a.synopsis);
+      if (!src || src === 'Sinopse não disponível.') return false;
+      while (new TextEncoder().encode(src).length > 480) src = src.slice(0, -10).replace(/\s+\S*$/, '') + '…';   /* limite da API: 500 bytes */
+      try {
+        const json = await fetchJSON('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(src) + '&langpair=en%7Cpt-BR');
+        const t = json && json.responseData && json.responseData.translatedText;
+        if (Number(json && json.responseStatus) !== 200 || typeof t !== 'string' || !t.trim() || /MYMEMORY WARNING|QUERY LENGTH|INVALID/i.test(t)) throw new Error((json && json.responseDetails) || 'resposta inesperada');
+        const pt = unesc(t).trim();
+        if (norm(pt) === norm(src)) throw new Error('sem tradução');
+        ptStore(a, pt, 'mt'); ptFails = 0;
+        return true;
+      } catch (e) { ptFails++; console.warn('[Kanshō] tradução:', a.id, e.message); return false; }
+    } finally { ptBusy.delete(a.id); }
+  }
+  /* destaques: garante sinopse em português nos 3 primeiros em alta (os da seleção fixa já estão em português) */
+  async function translateHero() {
+    if (translatingHero) return;
+    translatingHero = true;
+    try {
+      let slots = 0, tried = 0, changed = false;
+      for (const id of weeklyIds()) {
+        const a = byId[id];
+        if (!a || !a.banner) continue;
+        if (slots >= 3) break;
+        if (!a.dynamic || a.synPt) { slots++; continue; }
+        if (tried++ >= 5) break;
+        if (await translateSynopsis(a)) { slots++; changed = true; }
+        await sleep(300);
+      }
+      if (changed) rerenderAll();
+    } finally { translatingHero = false; }
+  }
+  function maybeTranslate(id) {
+    const a = byId[id];
+    if (!a || !a.dynamic || a.synPt) return;
+    translateSynopsis(a).then(ch => { const h = parseHash(); if (ch && h.name === 'detail' && h.arg === a.id) renderDetail(a.id); });
+  }
+
+  /* Quem recebe consulta ao MyAnimeList/IMDb: a seleção fixa + os mais populares do catálogo, até CONFIG.lookupMax */
+  function lookupList() {
+    const pop = a => catalogMeta.popularity[a.id] ?? a.popularity ?? -1;
+    const dyn = animes.filter(a => a.dynamic).sort((x, y) => pop(y) - pop(x));
+    const home = weeklyIds().map(id => byId[id]).filter(Boolean);   /* títulos da tela inicial: consultados primeiro, para terem as notas já nos primeiros segundos e dentro do limite do IMDb */
+    return [...new Set([...home, ...animes.filter(a => !a.dynamic), ...dyn])].slice(0, CONFIG.lookupMax);
+  }
+
+  /* --- Notícias dos animes em alta (API do MyAnimeList), com cache próprio. Rodam depois das notas, para não estourar o limite --- */
+  const EXTRAS_KEY = 'kansho-extras-v2';
+  let loadingExtras = false;
+  async function jikanGet(url) {
+    for (let attempt = 0; ; attempt++) {
+      try { return await fetchJSON(url); }
+      catch (e) {
+        const retry = e.status === 429 || e.status >= 500 || e.name === 'AbortError' || e instanceof TypeError;
+        if (!retry || attempt >= 1) throw e;
+        await sleep(1500);
+      }
+    }
+  }
+  let extrasAgain = false;
+  async function loadExtras() {
+    if (loadingExtras) { extrasAgain = true; return; }   /* pedido durante uma carga: repete depois, com o catálogo mais novo */
+    loadingExtras = true;
+    try {
+      renderTrailers();
+      const targets = weeklyIds().map(id => byId[id]).filter(a => a && a.malId).slice(0, 3);
+      if (!targets.length) return;
+      const ids = targets.map(a => a.id);
+      let cached = null;
+      try { cached = JSON.parse(storageGet(EXTRAS_KEY) || 'null'); } catch (e) { cached = null; }
+      if (cached && Array.isArray(cached.news) && cached.news.length) { extras.news = cached.news; renderNews(); }
+      else cached = null;
+      if (cached && Array.isArray(cached.ids) && cached.ids.join() === ids.join() && isNum(cached.fetchedAt) && Date.now() - cached.fetchedAt < CONFIG.newsTtlMs) return;
+
+      const items = [];
+      for (const a of targets) {
+        try {
+          const json = await jikanGet(`${CONFIG.malApi}/anime/${a.malId}/news`);
+          const n = (Array.isArray(json && json.data) ? json.data : []).find(x => x && x.title && safeUrl(x.url));
+          if (n) items.push({ title: String(n.title), url: safeUrl(n.url), date: String(n.date || ''), animeId: a.id });
+        } catch (e) { console.warn('[Kanshō] notícias:', a.id, e.message); }
+        await sleep(CONFIG.jikanDelayMs);
+      }
+      items.sort((x, y) => y.date.localeCompare(x.date));
+      if (items.length) {
+        extras.news = items;
+        storageSet(EXTRAS_KEY, JSON.stringify({ fetchedAt: items.length === targets.length ? Date.now() : 0, ids, news: items }));   /* 0 = incompleto: tenta de novo */
+        renderNews();
+      }
+    } finally { loadingExtras = false; if (extrasAgain) { extrasAgain = false; loadExtras(); } }
+  }
+
+  /* --- Aplica os dados lidos (cache ou rede) aos animes --- */
+  const cleanSrc = s => (s && isNum(s.score) && s.score > 0 && s.score <= 10)
+    ? { score: s.score, votes: isNum(s.votes) && s.votes > 0 ? s.votes : null } : null;
+
+  function applyData(items) {
+    animes.forEach(a => {
+      const d = Object.assign({}, items && items[a.id], catalogMeta.items[a.id]);   /* a lista do AniList é mais recente que o cache das notas */
+      a.popularity = isNum(d.popularity) ? d.popularity : null;
+      a.imdbSeries = !!d.imdbSeries;
+      a.src = { imdb: cleanSrc(d.imdb), mal: cleanSrc(d.mal), ani: cleanSrc(d.ani) };
+      a.anilistId = isNum(d.anilistId) ? d.anilistId : null;
+      a.cover = a.coverFixed || safeUrl(d.cover);   /* a capa fixada no catálogo, se houver, prevalece */
+      a.banner = safeUrl(d.banner);
+    });
+    computeScores();
+  }
+  function useSample() {
+    animes.forEach(a => {
+      const s = a.sample || {};
+      a.src = {};
+      SOURCES.forEach(k => { a.src[k] = isNum(s[k]) ? { score: s[k], votes: null } : null; });
+      a.anilistId = null; a.cover = a.coverFixed || ''; a.banner = '';
+    });
+    computeScores();
+  }
+
+  /* =====================================================================
+     MÉDIA KANSHŌ (ajustada por votos)
+     1) Cada nota é "encolhida" em direção à média da própria fonte no catálogo,
+        com peso proporcional ao nº de votos (estimativa bayesiana):
+            ajustada = v/(v+m) · nota  +  m/(v+m) · C
+        v = votos do anime nessa fonte | m = mediana de votos dessa fonte no catálogo
+        C = média das notas dessa fonte no catálogo.
+        Assim, 300 votos pesam bem menos que 300 mil.
+     2) A média Kanshō é a média simples das notas ajustadas das fontes disponíveis
+        (cada fonte vale o mesmo, mesmo que uma tenha milhões de votos a mais).
+     Sem nº de votos (ex.: valores de exemplo), a nota entra sem ajuste.
+     ===================================================================== */
+  function computeScores() {
+    const simple = getPrefs().avgMode === 'simple';
+    appliedAvgMode = simple ? 'simple' : 'weighted';
+    const mean = arr => arr.reduce((s, x) => s + x, 0) / arr.length;
+    const median = arr => {
+      const s = [...arr].sort((x, y) => x - y), n = s.length;
+      return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0;
+    };
+    const prior = {};
+    SOURCES.forEach(k => {
+      const rows = animes.map(a => a.src && a.src[k]).filter(Boolean);
+      prior[k] = { C: rows.length ? mean(rows.map(r => r.score)) : 0, m: median(rows.filter(r => r.votes).map(r => r.votes)) };
+    });
+    animes.forEach(a => {
+      const adjusted = [], raw = [];
+      SOURCES.forEach(k => {
+        const r = a.src && a.src[k];
+        a[k] = r ? r.score : null;
+        a[k + 'Votes'] = r ? r.votes : null;
+        if (!r) return;
+        raw.push(r.score);
+        const { C, m } = prior[k];
+        adjusted.push(r.votes && m ? (r.votes / (r.votes + m)) * r.score + (m / (r.votes + m)) * C : r.score);
+      });
+      a.raw = raw.length ? mean(raw) : null;
+      a.score = simple ? a.raw : (adjusted.length ? mean(adjusted) : null);
+    });
+    ranked = [...animes].sort((x, y) =>
+      (y.score != null) - (x.score != null) || (y.score ?? 0) - (x.score ?? 0) || x.title.localeCompare(y.title));
+  }
+
+  /* --- Cache --- */
+  function readCache() {
+    try {
+      const c = JSON.parse(storageGet(CACHE_KEY) || 'null');
+      if (c && typeof c === 'object' && c.items && typeof c.items === 'object') return c;
+    } catch (e) { /* cache corrompido: ignora */ }
+    return null;
+  }
+  const saveCache = (items, fetchedAt) => storageSet(CACHE_KEY, JSON.stringify({ fetchedAt, items }));
+
+  /* --- Atualização da tela --- */
+  let renderTimer;
+  const scheduleRender = () => { clearTimeout(renderTimer); renderTimer = setTimeout(rerenderAll, 200); };
+
+  function rerenderAll() {
+    slideIds = heroIds();
+    renderTop();
+    renderHomeReco();
+    showSlide(current);
+    renderRank();
+    renderGenresGrid();
+    renderNews();
+    updateRankNote();
+    const dyn = { detail: renderDetail, search: renderSearch, genre: renderGenre, favs: renderFavorites, foryou: renderReco };
+    const cur = parseHash();
+    if (dyn[cur.name] && $('view-' + cur.name).classList.contains('active')) dyn[cur.name](cur.arg);
+    refreshFavButtons();
+    updateBanner();
+    updateFooter();
+  }
+
+  function updateBanner() {
+    const b = $('dataBanner'), s = dataState;
+    const msgs = {
+      loading: 'Carregando as notas do AniList, MyAnimeList e IMDb…',
+      sample: 'Não foi possível conectar às fontes de notas. Exibindo valores de exemplo.',
+      partial: `${s.failed.join(' e ')} ${s.failed.length > 1 ? 'estão indisponíveis' : 'está indisponível'} nesta conexão. As médias usam apenas as notas disponíveis.`,
+      stale: 'Não foi possível atualizar as notas. Exibindo os últimos valores salvos.'
+    };
+    const msg = msgs[s.mode];
+    b.hidden = !msg;
+    b.innerHTML = msg ? `<span>${escapeHtml(msg)}</span>` + (s.mode === 'loading' ? '' : '<button type="button" id="retryData">Tentar novamente</button>') : '';
+  }
+
+  function updateFooter() {
+    const live = dataState.mode !== 'sample' && dataState.fetchedAt;
+    const when = live ? new Date(dataState.fetchedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    $('siteFooter').innerHTML = escapeHtml('Notas e capas: AniList, MyAnimeList (via API não oficial) e IMDb (via OMDb API). Os dados pertencem às respectivas fontes.'
+      + (when ? ` Última atualização: ${when}.` : '')) + ' <a href="#/sobre">Sobre o Kanshō</a>';
+  }
+
+  document.addEventListener('click', e => { if (e.target.id === 'retryData') loadScores(true); });
+
+  /* --- Orquestração: catálogo e cache primeiro, depois rede (as três fontes em paralelo) --- */
+  async function loadScores(force, quiet) {
+    if (loadingScores) return;
+    loadingScores = true;
+    try {
+      const catalogChanged = await refreshCatalog(force);
+      const cached = readCache();
+      const fresh = !!cached && isNum(cached.fetchedAt) && Date.now() - cached.fetchedAt < CONFIG.cacheTtlMs;
+      /* títulos acrescentados ao catálogo depois da última carga das notas: só eles precisam consultar o MyAnimeList/IMDb */
+      const hasMal = a => !!(cached && cached.items[a.id] && cached.items[a.id].mal !== undefined);
+      const lookups = lookupList();
+      const pendingMal = lookups.filter(a => a.malId && !hasMal(a));
+      const partialRun = !!cached && fresh && !force && pendingMal.length > 0;
+      if (cached) {
+        applyData(cached.items);
+        dataState.mode = fresh ? 'live' : 'cache';
+        dataState.fetchedAt = isNum(cached.fetchedAt) ? cached.fetchedAt : 0;
+        if (!quiet || catalogChanged) rerenderAll();
+        if (fresh && !force && !partialRun) return;
+      } else {
+        applyData({});                      /* capas e banners do catálogo já servem aos destaques */
+        dataState.mode = 'loading';
+        updateBanner();
+      }
+      /* notícias, trailers e sinopses traduzidas não dependem das notas: começam já, em paralelo, em vez de esperar a fila do MyAnimeList */
+      loadExtras(); translateHero();
+
+      const live =cached ? JSON.parse(JSON.stringify(cached.items)) : {};
+      const failed = new Set();
+      const run = async (source, fn) => {
+        try { await fn(); } catch (e) { failed.add(source); console.warn(`[Kanshō] ${source}:`, e.message); }
+        applyData(live); scheduleRender();
+      };
+      const malList = partialRun ? pendingMal : lookups.filter(x => x.malId);
+      await Promise.all([
+        partialRun ? Promise.resolve() : run('AniList', () => fetchAniList(live)),
+        run('MyAnimeList', async () => {
+          let streak = 0;   /* falhas seguidas: com a API fora do ar, não adianta percorrer todos os títulos */
+          for (const a of malList) {
+            try { await fetchJikanOne(a, live); streak = 0; }
+            catch (e) { failed.add('MyAnimeList'); streak++; console.warn('[Kanshō] MyAnimeList:', a.id, e.message); if (streak >= 3) break; }
+            applyData(live); scheduleRender();
+            await sleep(CONFIG.jikanDelayMs);
+          }
+        }),
+        CONFIG.omdbKey
+          ? run('IMDb', async () => {
+              for (const a of lookups.slice(0, CONFIG.imdbMax)) {
+                if (partialRun && live[a.id] && 'imdb' in live[a.id]) continue;
+                try { await fetchOmdbOne(a, live); }
+                catch (e) {
+                  failed.add('IMDb'); console.warn('[Kanshō] IMDb:', a.id, e.message);
+                  if (e.fatal || e.status === 401 || e.status === 403) break;   /* chave/limite: não adianta insistir */
+                }
+                applyData(live); scheduleRender();
+                await sleep(100);
+              }
+            })
+          : Promise.resolve(console.info('[Kanshō] IMDb desativado: defina CONFIG.omdbKey para exibir as notas do IMDb.'))
+      ]);
+
+      const anyScore = animes.some(a => SOURCES.some(k => a.src && a.src[k]));
+      if (partialRun) {
+        dataState.failed = [...failed];
+        dataState.mode = failed.size ? 'partial' : 'live';
+        saveCache(live, dataState.fetchedAt);     /* mantém a data da carga completa: só os títulos novos foram completados */
+      } else if (!anyScore) {
+        if (cached) dataState.mode = 'stale';
+        else { useSample(); dataState.mode = 'sample'; }
+        dataState.failed = [...failed];
+      } else if (failed.size >= 2 + (CONFIG.omdbKey ? 1 : 0)) {
+        dataState.mode = 'stale';                 /* todas as fontes falharam, mas há cache: mantém o que foi salvo */
+        dataState.failed = [...failed];
+      } else {
+        const ok = failed.size === 0;
+        dataState.failed = [...failed];
+        /* com falha parcial, grava fetchedAt = 0 (ou o anterior) para tentar de novo na próxima visita */
+        dataState.fetchedAt = ok ? Date.now() : (cached && isNum(cached.fetchedAt) ? cached.fetchedAt : 0);
+        saveCache(live, dataState.fetchedAt);
+        dataState.mode = ok ? 'live' : 'partial';
+      }
+      clearTimeout(renderTimer);
+      rerenderAll();
+    } finally { loadingScores = false; }
+  }
+
+  /* ===== Menu do cabeçalho (celular/tablet): botão com aria-expanded, fecha com Esc, clique fora ou ao navegar ===== */
+  const menuBtn = $('menuToggle'), siteNav = $('siteNav');
+  function setMenu(open) {
+    siteNav.classList.toggle('open', open);
+    menuBtn.setAttribute('aria-expanded', String(open));
+    menuBtn.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
+  }
+  const closeMenu = () => setMenu(false);
+  menuBtn.addEventListener('click', () => setMenu(!siteNav.classList.contains('open')));
+  siteNav.addEventListener('click', e => { if (e.target.closest('a')) closeMenu(); });
+  document.addEventListener('click', e => { if (siteNav.classList.contains('open') && !e.target.closest('#siteNav, #menuToggle')) closeMenu(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && siteNav.classList.contains('open')) { closeMenu(); menuBtn.focus(); }
+  });
+  window.matchMedia('(min-width: 1120px)').addEventListener('change', e => { if (e.matches) closeMenu(); });
+
+  /* "Pular para o conteúdo": feito por JS porque o href="#main" colidiria com o roteamento por hash */
+  $('skipLink').addEventListener('click', e => { e.preventDefault(); $('main').focus(); $('main').scrollIntoView(); });
+
+  /* ===== Busca: sugestões enquanto digita (padrão combobox/listbox) e página de resultados ===== */
+  const sInput = $('searchInput'), sList = $('searchList'), sForm = $('searchForm');
+  const sOptions = () => [...sList.querySelectorAll('[role="option"]')];
+  let sActive = -1;
+
+  function closeSuggest() {
+    sList.hidden = true; sList.innerHTML = ''; sActive = -1;
+    sInput.setAttribute('aria-expanded', 'false'); sInput.removeAttribute('aria-activedescendant');
+  }
+  function openSuggest(q) {
+    const hits = searchAnimes(q);
+    const shown = hits.slice(0, 6);
+    let html = shown.map((a, i) => `<li role="option" id="sug-${i}" data-id="${a.id}" aria-selected="false">
+      <span class="sl-cover ${a.cls}" ${coverStyle(a)} aria-hidden="true"></span>
+      <span class="sl-t">${a.title}</span><span class="sl-m" title="Média Kanshō">${f2(a.score)}</span></li>`).join('');
+    if (!hits.length) html = '<li class="sl-empty" role="presentation">Nenhum anime encontrado</li>';
+    else if (hits.length > shown.length) html += `<li class="sl-all" id="sug-all" role="option" data-all="1" aria-selected="false">Ver todos os ${hits.length} resultados</li>`;
+    sList.innerHTML = html; sList.hidden = false; sActive = -1;
+    sInput.setAttribute('aria-expanded', 'true'); sInput.removeAttribute('aria-activedescendant');
+  }
+  function setActive(i) {
+    const opts = sOptions();
+    if (!opts.length) return;
+    sActive = (i + opts.length) % opts.length;
+    opts.forEach((o, k) => { o.classList.toggle('active', k === sActive); o.setAttribute('aria-selected', String(k === sActive)); });
+    sInput.setAttribute('aria-activedescendant', opts[sActive].id);
+    opts[sActive].scrollIntoView({ block: 'nearest' });
+  }
+  function submitSearch() {
+    const q = sInput.value.trim();
+    closeSuggest();
+    if (!q) { sInput.focus(); return; }
+    goTo('#/busca/' + encodeURIComponent(q));
+  }
+  function chooseOption(opt) {
+    if (!opt) return;
+    if (opt.dataset.all) return submitSearch();
+    closeSuggest();
+    goTo('#/anime/' + opt.dataset.id);
+  }
+  sInput.addEventListener('input', () => { const q = sInput.value.trim(); q ? openSuggest(q) : closeSuggest(); });
+  sInput.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (sList.hidden && sInput.value.trim()) openSuggest(sInput.value.trim());
+      setActive(sActive < 0 ? (e.key === 'ArrowDown' ? 0 : -1) : sActive + (e.key === 'ArrowDown' ? 1 : -1));
+    } else if (e.key === 'Enter' && sActive >= 0) {
+      e.preventDefault(); chooseOption(sOptions()[sActive]);
+    } else if (e.key === 'Escape' && !sList.hidden) {
+      e.preventDefault(); closeSuggest();
+    }
+  });
+  sForm.addEventListener('submit', e => { e.preventDefault(); submitSearch(); });
+  sList.addEventListener('mousedown', e => e.preventDefault());   /* mantém o foco no campo ao clicar numa sugestão */
+  sList.addEventListener('click', e => chooseOption(e.target.closest('[role="option"]')));
+  sForm.addEventListener('focusout', e => { if (!sForm.contains(e.relatedTarget)) closeSuggest(); });
+
+  function renderSearch(q) {
+    const list = searchAnimes(q);
+    const safe = escapeHtml(q);
+    $('searchBox').innerHTML = `<h1 class="genres-title">Resultados para “${safe}”</h1>` + (list.length
+      ? `<p class="fav-sub">${plural(list.length, 'anime encontrado', 'animes encontrados')}</p>` + cardsHTML(list)
+      : `<div class="empty-box"><p>Nenhum anime encontrado para “${safe}”.</p>
+          <p>Tente outro título, um gênero (como <a href="#/generos/isekai">Isekai</a>) ou veja o <a href="#/mais-votados">ranking completo</a>.</p></div>`);
+    document.title = `Busca: ${q} | Kanshō`;
+  }
+
+  function updateRankNote() {
+    const simple = getPrefs().avgMode === 'simple';
+    $('rankNote').textContent = 'As notas vêm do IMDB, do MyAnimeList e do AniList (escala de 0 a 10). '
+      + (simple
+        ? 'Seguindo a sua configuração, a média é a média simples das notas disponíveis. '
+        : 'A média Kanshō ajusta cada nota pelo número de votos da própria fonte, de modo que títulos com poucos votos não superem os muito avaliados, e depois calcula a média simples entre as fontes disponíveis. ')
+      + (rankMode === 'pop' ? 'Na ordem por popularidade, a posição reflete em quantas listas de usuários do AniList o anime aparece. ' : '')
+      + 'Quando uma fonte não tem nota para um anime, ela é ignorada. Clique em um anime para ver os detalhes.';
+  }
+
+  /* ===== Roteamento por hash (#/, #/mais-votados, #/generos, #/generos/<gênero>, #/busca/<termo>,
+     #/para-voce, #/favoritos, #/perfil, #/sobre, #/anime/ID) ===== */
+  const safeDecode = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
+  function parseHash() {
+    const hash = location.hash || '#/';
+    let m;
+    if ((m = hash.match(/^#\/anime\/(.+)$/))) return { name: 'detail', arg: safeDecode(m[1]), hash };
+    if ((m = hash.match(/^#\/generos\/([^/]+)$/))) return { name: 'genre', arg: safeDecode(m[1]), hash };
+    if ((m = hash.match(/^#\/busca(?:\/(.*))?$/))) return { name: 'search', arg: safeDecode(m[1] || ''), hash };
+    const names = [['#/mais-votados', 'rank'], ['#/generos', 'genres'], ['#/para-voce', 'foryou'], ['#/favoritos', 'favs'], ['#/perfil', 'profile'],
+                   ['#/sobre', 'about'], ['#/login', 'login'], ['#/cadastro', 'register']];
+    const hit = names.find(([p]) => hash.startsWith(p));
+    return { name: hit ? hit[1] : 'home', arg: '', hash };
+  }
+
+  const VIEWS = ['home', 'rank', 'genres', 'genre', 'search', 'detail', 'foryou', 'favs', 'profile', 'about', 'login', 'register'];
+  const NAV_OF = { rank: 'navRank', genres: 'navGenres', genre: 'navGenres', foryou: 'navForYou', favs: 'navFavs', profile: 'navSettings', about: 'navAbout' };
+  let lastHash = null;
+
+  function route() {
+    const { name, arg, hash } = parseHash();
+
+    /* Rotas que dependem do login */
+    if ((name === 'profile' || name === 'favs' || name === 'foryou') && !currentUser()) { afterAuth = hash; location.hash = '#/login'; return; }
+    if ((name === 'login' || name === 'register') && currentUser()) { location.hash = '#/perfil'; return; }
+    updateAuthUI();
+    if (name !== 'login' && name !== 'register') afterAuth = null;
+
+    VIEWS.forEach(v => $('view-' + v).classList.toggle('active', v === name));
+    $('main').classList.toggle('wide', name === 'rank' || name === 'detail');
+    $('main').classList.toggle('full', ['genres', 'genre', 'search', 'foryou', 'favs', 'profile', 'about', 'login', 'register'].includes(name));
+    document.querySelectorAll('#siteNav a').forEach(l => {
+      const on = NAV_OF[name] === l.id;
+      l.classList.toggle('active', on);
+      if (on) l.setAttribute('aria-current', 'page'); else l.removeAttribute('aria-current');
+    });
+    closeMenu();
+    if (name === 'search') sInput.value = arg;
+
+    const titles = {
+      home: 'Kanshō | Agregador de Avaliações de Animes',
+      rank: 'Mais votados | Kanshō',
+      genres: 'Gêneros | Kanshō',
+      foryou: 'Para você | Kanshō',
+      favs: 'Favoritos | Kanshō',
+      profile: 'Perfil | Kanshō',
+      about: 'Sobre | Kanshō',
+      login: 'Entrar | Kanshō',
+      register: 'Cadastro | Kanshō'
+    };
+    if (name === 'detail') { renderDetail(arg); maybeTranslate(arg); }
+    else if (name === 'genre') renderGenre(arg);
+    else if (name === 'search') renderSearch(arg);
+    else {
+      document.title = titles[name];
+      if (name === 'profile') renderProfile();
+      if (name === 'favs') renderFavorites();
+      if (name === 'foryou') { forYouLimit = PREF_PAGE; renderForYou(); }
+      if (name === 'login' || name === 'register') resetAuthForms();
+    }
+    renderHomeReco();
+    updateRankNote();
+    syncPrefs();
+    refreshFavButtons();
+    window.scrollTo(0, 0);
+    /* leitores de tela e teclado: ao trocar de página, o foco vai para o conteúdo */
+    if (lastHash !== null && lastHash !== hash) $('main').focus({ preventScroll: true });
+    lastHash = hash;
+  }
+  window.addEventListener('hashchange', route);
+  mergeCatalog(readCatalogCache());                      /* catálogo salvo na última visita: favoritos e páginas já abrem */
+  { const c0 = readCache(); applyData(c0 ? c0.items : {}); }
+  route();
+  appReady = true;
+  if (catalogMeta.trending.length) loadExtras();   /* trailers e notícias do cache da última visita aparecem na hora (na 1ª visita, esperam o catálogo, para não buscar notícias de títulos que vão mudar) */
+  loadScores();   /* busca (ou lê do cache) as notas e capas reais */
+  setInterval(() => { if (!document.hidden) loadScores(false, true); }, CONFIG.refreshMs);   /* "tempo real": confere novidades com a página aberta */
+</script>
+</body>
+</html>
